@@ -323,7 +323,7 @@ def main():
             # print(f"{pdbfile}: fixing catalytic residues")
             for i, ref_catres in enumerate(matched_residues.keys()):
                 if bb_inpaint is True:
-                    tgt_catres = trb["con_hal_idx0"][trb["con_ref_idx0"].tolist().index(ref_catres-1)]+1
+                    tgt_catres = trb["con_hal_idx0"][trb["con_ref_idx0"].index(ref_catres-1)]+1
                 else:
                     tgt_catres = ref_catres
 
