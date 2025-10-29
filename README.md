@@ -1,9 +1,8 @@
-# De novo heme binding protein design pipeline using RFdiffusionAA
-![image](https://github.com/ikalvet/heme_binder_diffusion/assets/30599647/6aa36676-9cba-4a9d-940c-a313920935f3)
-#### And other ligand binders too, I guess
-Indrek Kalvet, PhD (Institute for Protein Design, University of Washington), ikalvet@uw.edu
+# De novo Chemically induced dimer design pipeline using RFdiffusionAA
+Custom modifications of this pipeline https://github.com/ikalvet/heme_binder_diffusion from Indrek Kalvet, PhD (Institute for Protein Design, University of Washington).
 
-As implemented in the publication <i>"Generalized Biomolecular Modeling and Design with RoseTTAFold All-Atom"</i>
+Purpose: to be able to design Chemically induced dimers
+
 
 Link:
 
