@@ -50,9 +50,9 @@ wget -q https://files.ipd.uw.edu/pub/ligandmpnn/solublempnn_v_48_020.pt -O ${dir
 
 
 #### AF2 model weights
-echo "Downloading AlphaFold2 model weights"
-cd lib/alphafold
-mkdir -p model_weights/params && cd model_weights/params
-wget https://storage.googleapis.com/alphafold/alphafold_params_2021-07-14.tar
-tar --extract --verbose --file=alphafold_params_2021-07-14.tar
-cd ../../../..
+#echo "Downloading AlphaFold2 model weights"
+#cd lib/alphafold
+#mkdir -p model_weights/params && cd model_weights/params
+#wget https://storage.googleapis.com/alphafold/alphafold_params_2021-07-14.tar
+#tar --extract --verbose --file=alphafold_params_2021-07-14.tar
+#cd ../../../..
