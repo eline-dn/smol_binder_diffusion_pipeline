@@ -1,6 +1,6 @@
 # De novo Chemically induced dimer design pipeline using RFdiffusionAA
 Custom modifications of this pipeline https://github.com/ikalvet/heme_binder_diffusion from Indrek Kalvet, PhD (Institute for Protein Design, University of Washington).
-
+![image](https://github.com/ikalvet/heme_binder_diffusion/assets/30599647/6aa36676-9cba-4a9d-940c-a313920935f3)
 Purpose: to be able to design Chemically induced dimers
 
 
