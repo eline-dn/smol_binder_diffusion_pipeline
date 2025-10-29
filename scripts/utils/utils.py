@@ -241,7 +241,7 @@ def dump_scorefile(df, filename):
             file.write(line + "\n")
 
 
-def create_slurm_submit_script(filename, gpu=False, gres=None, time=None, mem="2g", N_nodes=1, N_cores=1, name=None, array=None, array_commandfile=None, group=None, email=None, command=None, outfile_name="output"):
+def create_slurm_submit_script(filename, gpu=False, gres="gpu:1", time=None, mem="2g", N_nodes=1, N_cores=1, name=None, array=None, array_commandfile=None, group=None, email=None, command=None, outfile_name="output", partition="l40s"):
     """
     Arguments:
         time (str) :: time in 'D-HH:MM:SS'
@@ -261,6 +261,7 @@ def create_slurm_submit_script(filename, gpu=False, gres=None, time=None, mem="2
 #SBATCH --mem={mem}
 #SBATCH -o {outfile_name}.log
 #SBATCH -e {outfile_name}.err
+#SBATCH --partition={partition}
 '''
     if gpu is True:
         submit_txt += f"""#SBATCH -p gpu
