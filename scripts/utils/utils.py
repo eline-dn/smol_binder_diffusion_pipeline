@@ -266,8 +266,8 @@ def create_slurm_submit_script(filename, gpu=False, gres="gpu:1", time=None, mem
     if gpu is True:
         submit_txt += f"""#SBATCH -p gpu
 #SBATCH --gres={gres}\n"""
-    else:
-        submit_txt += "#SBATCH -p cpu\n"
+    #else:
+        #submit_txt += "#SBATCH -p cpu\n"
     
     if email is not None:
         assert "@" in email, "invalid email address provided"
