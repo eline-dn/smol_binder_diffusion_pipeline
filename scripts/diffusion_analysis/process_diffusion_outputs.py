@@ -122,7 +122,7 @@ def read_pose_from_str_and_fix_issues(pdbfile, trb):
         if "ATOM" in l:
             # Extract coordinates and convert to float
             x = float(l[30:39].strip())
-            y = float(l[39:48].strip())
+            y = float(l[39:47].strip())
             z = float(l[48:55].strip())
 
             # Check if coordinates are (0,0,0) and exclude the line
