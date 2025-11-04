@@ -120,6 +120,14 @@ def read_pose_from_str_and_fix_issues(pdbfile, trb):
     new_pdb = []
     for i, l in enumerate(pdbff):
         if "ATOM" in l:
+            # Extract coordinates and convert to float
+            x = float(l[30:39].strip())
+            y = float(l[39:48].strip())
+            z = float(l[48:55].strip())
+
+            # Check if coordinates are (0,0,0) and exclude the line
+            if x == 0.000 and y == 0.000 and z == 0.000:
+                continue  # Skip this line
             if int(l.split()[5])-1 not in trb["con_hal_idx0"]:
                 if l.split()[3] in ["VAL", "GLN", "ARG", "LYS", "GLU", "ASN", "ASP", "MET", "PRO"]:
                     new_pdb.append(l[:17]+"GLY"+l[20:])
