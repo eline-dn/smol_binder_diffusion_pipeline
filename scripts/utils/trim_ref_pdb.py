@@ -117,5 +117,7 @@ for pdb in glob.glob(f"{pdb_files}/*.pdb"):
   out_path=os.path.join(output_folder, os.path.basename(pdb))
   extract_chain(pdb, out_path, 'A')
   trim_pdb(out_path, out_path)
-  
+
+
+print(f"Modified {len(glob.glob(f"{pdb_files}/*.pdb"))} PDB files")
 
