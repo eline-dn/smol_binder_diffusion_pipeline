@@ -1,6 +1,5 @@
 import os, sys, glob
 import pandas as pd
-import colabdesign
 import numpy as np
 
 from Bio import BiopythonWarning
