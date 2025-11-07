@@ -13,6 +13,34 @@ from Bio.PDB import StructureBuilder
 from Bio.PDB.Polypeptide import is_aa # Assuming is_aa is needed and available
 
 
+def _copy_structure_with_only_chain(structure, chain_id):
+    """Return a new Structure containing only model 0 and a deep copy of chain `chain_id`."""
+    # Build a tiny structure hierarchy: Structure -> Model(0) -> Chain(chain_id) -> Residues/Atoms
+
+    sb = StructureBuilder.StructureBuilder()
+    sb.init_structure("single")
+    sb.init_model(1)
+    sb.init_chain(chain_id)
+    # Set segment ID, padded to 4 characters
+    sb.init_seg(chain_id.ljust(4))    
+    model0 = structure[0]
+    if chain_id not in [c.id for c in model0.get_chains()]:
+        raise ValueError(f"Chain '{chain_id}' not found.")
+    chain = model0[chain_id]
+    for res in chain:
+        # Keep only amino-acid residues
+        # Assuming is_aa is defined elsewhere and available
+        if not is_aa(res, standard=False):
+            continue
+        hetflag, resseq, icode = res.id
+        sb.init_residue(res.resname, hetflag, resseq, icode)
+
+        for atom in res:
+            sb.init_atom(atom.name, atom.coord, atom.bfactor, atom.occupancy,
+                         atom.altloc, atom.fullname, element=atom.element)
+    return sb.get_structure()
+    
+
 def trim_pdb(input_pdb_path, output_pdb_path, trim_length=411):
     """
     Trims the first N amino acids from a PDB file.
