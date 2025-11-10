@@ -14,19 +14,6 @@ assert os.path.exists(SCRIPT_DIR)
 sys.path.append(SCRIPT_DIR+"/scripts/utils")
 import utils
 
-from Bio import BiopythonWarning
-from Bio.PDB import DSSP, Selection, Polypeptide, Select, Chain, Superimposer
-from Bio.PDB.SASA import ShrakeRupley
-from Bio.SeqUtils.ProtParam import ProteinAnalysis
-from Bio.PDB.Selection import unfold_entities
-
-from Bio.PDB import PDBParser, PDBIO, Model, Chain, Structure
-from Bio.PDB import StructureBuilder
-from Bio.PDB.Polypeptide import is_aa 
-from Bio.PDB.PDBList import PDBList
-
-
-
 """
 extract target and ligand
 run AF2 single seq (with MSA would use the crystal structure as an input and infer that the loop is ok/ not to flexible, so here without MSA and templates)
@@ -34,10 +21,8 @@ extract loop plDDT => flexibility
 """
 #----------------------------------------
 # af helpers
-
-import os,sys
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 import mock
-import numpy as np
 import tempfile
 from typing import Dict
 from timeit import default_timer as timer
