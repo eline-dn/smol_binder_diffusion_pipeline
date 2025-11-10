@@ -1,0 +1,374 @@
+import os, sys, glob
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import getpass
+import subprocess
+import time
+import importlib
+from shutil import copy2
+import Bio.PDB
+### Path to this cloned GitHub repo:
+SCRIPT_DIR = "/work/lpdi/users/eline/smol_binder_diffusion_pipeline"  # edit this to the GitHub repo path. Throws an error by default.
+assert os.path.exists(SCRIPT_DIR)
+sys.path.append(SCRIPT_DIR+"/scripts/utils")
+import utils
+
+from Bio import BiopythonWarning
+from Bio.PDB import DSSP, Selection, Polypeptide, Select, Chain, Superimposer
+from Bio.PDB.SASA import ShrakeRupley
+from Bio.SeqUtils.ProtParam import ProteinAnalysis
+from Bio.PDB.Selection import unfold_entities
+
+from Bio.PDB import PDBParser, PDBIO, Model, Chain, Structure
+from Bio.PDB import StructureBuilder
+from Bio.PDB.Polypeptide import is_aa 
+from Bio.PDB.PDBList import PDBList
+
+
+
+"""
+extract target and ligand
+run AF2 single seq (with MSA would use the crystal structure as an input and infer that the loop is ok/ not to flexible, so here without MSA and templates)
+extract loop plDDT => flexibility
+"""
+
+
+
+# helper functions:
+
+def _copy_structure_with_only_chain(structure, chain_id):
+    """Return a new Structure containing only model 0 and a deep copy of chain `chain_id`."""
+    # Build a tiny structure hierarchy: Structure -> Model(0) -> Chain(chain_id) -> Residues/Atoms
+
+    sb = StructureBuilder.StructureBuilder()
+    sb.init_structure("single")
+    sb.init_model(1)
+    sb.init_chain(chain_id)
+    # Set segment ID, padded to 4 characters
+    sb.init_seg(chain_id.ljust(4))    
+    model0 = structure[0]
+    if chain_id not in [c.id for c in model0.get_chains()]:
+        raise ValueError(f"Chain '{chain_id}' not found.")
+    chain = model0[chain_id]
+    for res in chain:
+        # Keep only amino-acid residues
+        # Assuming is_aa is defined elsewhere and available
+        if not is_aa(res, standard=False):
+            continue
+        hetflag, resseq, icode = res.id
+        sb.init_residue(res.resname, hetflag, resseq, icode)
+
+        for atom in res:
+            sb.init_atom(atom.name, atom.coord, atom.bfactor, atom.occupancy,
+                         atom.altloc, atom.fullname, element=atom.element)
+    return sb.get_structure()
+    
+
+def trim_pdb(input_pdb_path, output_pdb_path, trim_length=410):
+    """
+    Trims the first N amino acids from a PDB file.
+
+    Args:
+        input_pdb_path (str): Path to the input PDB file.
+        output_pdb_path (str): Path to save the trimmed PDB file.
+        trim_length (int): The number of amino acids to trim from the beginning.
+    """
+    parser = PDBParser()
+    structure = parser.get_structure("protein", input_pdb_path)
+
+    for model in structure:
+        for chain in model:
+            # Get all residues in the chain
+            residues = list(chain.get_residues())
+            # Keep residues from index trim_length onwards
+            for i, residue in enumerate(residues):
+                if i < trim_length:
+                    chain.detach_child(residue.get_id())
+
+    io = PDBIO(use_model_flag=1)
+    io.set_structure(structure)
+    io.save(output_pdb_path)
+
+# Example usage:
+# Assuming you have a PDB file named 'input.pdb' in the current directory
+# trim_pdb('input.pdb', 'trimmed_output.pdb')
+# print("Trimmed PDB file saved as 'trimmed_output.pdb'")
+
+
+
+def extract_chain(input_pdb_path: str, output_pdb_path: str, chain_id: str):
+    """
+    Extracts a specific chain from a PDB file using _copy_structure_with_only_chain
+    and saves it to a new PDB file with explicit MODEL/ENDMDL records.
+
+    Args:
+        input_pdb_path (str): Path to the input PDB file (complex).
+        output_pdb_path (str): Path to save the extracted chain PDB file.
+        chain_id (str): The identifier of the chain to extract (e.g., "A", "B").
+    """
+    parser = PDBParser()
+    structure = parser.get_structure("protein", input_pdb_path)
+    io = PDBIO(use_model_flag=1)
+
+    # Use the helper function to get a new structure with only the desired chain
+    new_structure = _copy_structure_with_only_chain(structure, chain_id)
+
+    # --- Debug Print Statements ---
+    print(f"--- Debug: Saving structure for {output_pdb_path} ---")
+    print(f"Number of models in structure to save: {len(new_structure)}")
+    for i, model in enumerate(new_structure):
+        print(f"  Model {i}: Number of chains = {len(model)}")
+        for j, chain in enumerate(model):
+            print(f"    Chain {chain.id}: Number of residues = {len(chain)}")
+            # Optional: print a few residue IDs and segids to confirm content
+            print(f"      First few residues (ID, SegID): {[(r.id, r.segid) for r in list(chain.get_residues())[:5]]}")
+    print("----------------------------------------------------")
+    # --- End Debug Print Statements ---
+
+    # Save the new structure, explicitly writing model records
+    io.set_structure(new_structure)
+    io.save(output_pdb_path)
+
+# Example usage (assuming you have a complex PDB file named 'complex.pdb'):
+# extract_chain('complex.pdb', 'chain_A.pdb', 'A')
+# print("Chain A saved to 'chain_A.pdb'")
+
+----------------------------------------
+# af helpers
+
+import os,sys
+import mock
+import numpy as np
+import tempfile
+from typing import Dict
+from timeit import default_timer as timer
+
+SCRIPT_DIR = os.path.dirname(__file__)
+sys.path.append(f"{SCRIPT_DIR}/../../lib/alphafold")
+from alphafold.common import protein
+from alphafold.data import pipeline
+from alphafold.data import templates
+from alphafold.data import parsers
+from alphafold.model import data
+from alphafold.model import config
+from alphafold.model import model
+
+from jax.lib import xla_bridge
+
+os.environ['TF_FORCE_UNIFIED_MEMORY'] = '1'
+os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '2.0'
+
+
+def predict_sequences(sequences, models, nrecycles, scorefile=None, random_seed=None, nstruct=1, npy=False):
+    # setup which models to use
+    # note for demo, we are only using model_4
+    _models_start = timer()
+    model_runners = {}
+    for m in models:
+        model_name = 'model_'+m
+        model_config = config.model_config(model_name)
+        model_config.data.eval.num_ensemble = 1
+
+        model_config.model.num_recycle = nrecycles
+        model_config.data.common.num_recycle = nrecycles
+
+        model_config.data.common.max_extra_msa = 1
+        model_config.data.eval.max_msa_clusters = 1
+
+        #model_params = data.get_model_haiku_params(model_name=model_name, data_dir=f"{SCRIPT_DIR}/../../lib/alphafold/model_weights")
+        model_params= data.get_model_haiku_params(model_name=model_name, data_dir="/work/lpdi/users/eline/FastBC/FastBC")
+        model_runner = model.RunModel(model_config, model_params)
+        model_runners[model_name] = model_runner
+    print(f"Setting up models took {(timer() - _models_start):.3f} seconds.")
+
+    i = 0
+    predictions = []
+    prefix = tempfile._get_default_tempdir() + '/' + next(tempfile._get_candidate_names())
+    print(prefix)
+
+    _st = timer()
+    for sequence in sequences:
+        query_sequence = sequence[0]
+        for n in range(nstruct):
+            pdb_file = f"{prefix}{i}_{n}"
+            start = timer()
+
+            # mock pipeline for single sequence prediction
+            data_pipeline_mock = mock.Mock()
+            data_pipeline_mock.process.return_value = {
+                **pipeline.make_sequence_features(sequence=query_sequence,
+                                                  description="none",
+                                                  num_res=len(query_sequence)),
+                **pipeline.make_msa_features([parsers.Msa(sequences=[query_sequence],
+                                                         deletion_matrix=[[0]*len(query_sequence)],
+                                                         descriptions=["none"])]),
+                **mk_mock_template(query_sequence)
+            }
+
+
+            if random_seed is None and nstruct == 1:
+                random_seed = 0
+            elif random_seed is not None or nstruct > 1:
+                random_seed = np.random.randint(99999)
+                # print(f"Random seed = {random_seed}")
+
+            from numpy import random
+            x = random.choice(models)            
+            results = predict_structure(
+                 pdb_file=pdb_file,
+                 data_pipeline=data_pipeline_mock,
+                 model_runners=model_runners[x-1], # using a random model between the five 
+                 random_seed=random_seed
+            )
+
+            time = timer() - start;
+  
+            for result in results:      
+                lddt = np.mean(result['lddts'])
+                print(result['lddts'])
+
+                pred = {'i': i,
+                        'tag': result['model'],
+                        'sequence': query_sequence,
+                        'description': sequence[1],
+                        'nrecycles': nrecycles,
+                        'lddt': lddt,
+                        # 'pdb_file': result['pdb_file'],
+                        # 'npy_file': result['npy_file'],
+                        'time': time}
+
+                predictions.append(pred)
+                
+                # Dump PDB file
+                fn = f"{sequence[1]}_{result['model']}.{n}_r{nrecycles}_af2"
+                _pdbf = open(result['pdb_file'], "rb").read()
+                with open(f"{fn}.pdb", "wb") as file:
+                    file.write(_pdbf)
+
+                if npy is True:
+                    # Dumping the NPZ file
+                    _npy = open(result['npy_file'], "rb").read()
+                    with open(f"{fn}.npz", "wb") as file:
+                        file.write(_npy)
+
+
+                # Add line to scorefile
+                if scorefile is not None:
+                    with open(scorefile, "a") as sf:
+                        sf.write("%d,%s,%s,%s,%s,%.3f,%.1f\n" % (
+                                pred['i'],
+                                pred['description'],
+                                pred['sequence'],
+                                pred['tag'],
+                                fn,
+                                pred['lddt'],
+                                pred['time']
+                                ))
+            print("Sequence %d completed in %.1f sec with %d models; lDDT=%.3f" % (i, time, len(results), lddt))
+        i += 1
+
+    print(f"Done with {i} sequences. {(timer() - _st):.3f} sec.")
+
+    return predictions
+
+
+def mk_mock_template(query_sequence):
+    # mock template features
+    output_templates_sequence = []
+    output_confidence_scores = []
+    templates_all_atom_positions = []
+    templates_all_atom_masks = []
+
+    for _ in query_sequence:
+        templates_all_atom_positions.append(np.zeros((templates.residue_constants.atom_type_num, 3)))
+        templates_all_atom_masks.append(np.zeros(templates.residue_constants.atom_type_num))
+        output_templates_sequence.append('-')
+        output_confidence_scores.append(-1)
+    output_templates_sequence = ''.join(output_templates_sequence)
+    templates_aatype = templates.residue_constants.sequence_to_onehot(output_templates_sequence,
+                                                                    templates.residue_constants.HHBLITS_AA_TO_ID)
+
+    template_features = {'template_all_atom_positions': np.array(templates_all_atom_positions)[None],
+        'template_all_atom_masks': np.array(templates_all_atom_masks)[None],
+        'template_sequence': [f'none'.encode()],
+        'template_aatype': np.array(templates_aatype)[None],
+        'template_confidence_scores': np.array(output_confidence_scores)[None],
+        'template_domain_names': [f'none'.encode()],
+        'template_release_date': [f'none'.encode()]}
+        
+    return template_features
+
+
+def predict_structure(
+    pdb_file: str,
+    data_pipeline: pipeline.DataPipeline,
+    model_runners: Dict[str, model.RunModel],
+    random_seed: int):
+  
+    """Predicts structure using AlphaFold for the given sequence."""
+
+    # Get features.
+    feature_dict = data_pipeline.process()
+
+    # Run the models.
+    results = []
+    for model_name, model_runner in model_runners.items():
+      # print("Predicting with ", model_name)
+      processed_feature_dict = model_runner.process_features(feature_dict, random_seed=random_seed)
+      prediction_result = model_runner.predict(processed_feature_dict, random_seed=random_seed)
+      unrelaxed_protein = protein.from_prediction(processed_feature_dict,prediction_result)
+
+      model_pdb_file = pdb_file + '_' + model_name
+      with open(model_pdb_file, 'w') as f:
+          f.write(protein.to_pdb(unrelaxed_protein))
+
+      model_npy_file = model_pdb_file + '.npy'
+      np.save(model_npy_file, prediction_result['plddt'])
+
+      results.append({ 'lddts': prediction_result['plddt'], 'pdb_file': model_pdb_file, 'npy_file': model_npy_file, 'model': model_name })
+
+    return results
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+#pdb_files=sys.argv[1] # path to the folder with the input/ reference pdb files, that we want to extract the binder structure from
+#output_folder=sys.argv[2] # path to the folder where the trimmed pdb should be store (= binder structure references)
+WDIR="/work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout"
+pl=PDBList()
+pdb_path=pl.retrieve_pdb_file("1Z9Y", file_format="pdb")
+
+
+####################################################extract sequence from chain A 
+parser = PDBParser(QUIET=True)
+structure = parser.get_structure("complex", pdb_path)
+res_list=list()
+
+three_to_one_map = {
+    "ALA":"A","CYS":"C","ASP":"D","GLU":"E","PHE":"F","GLY":"G","HIS":"H","ILE":"I",
+    "LYS":"K","LEU":"L","MET":"M","ASN":"N","PRO":"P","GLN":"Q","ARG":"R","SER":"S",
+    "THR":"T","VAL":"V","TRP":"W","TYR":"Y"}
+
+ for model in structure:
+   for chain in model:
+     if chain.id=="A":
+       # Get all residues in the chain
+       residues = list(chain.get_residues())
+        # Keep residues before index trim_length
+        for i, residue in enumerate(residues):
+          if is_aa(residue, standard=False): #i < trim_length and?
+            res_list.append(three_to_one_map[residue.resname])
+seq="".join(res_list)                  
+sequence=list(seq)
+############################### repredict the structure with AF2
+with open(scores.csv, "a") as file:
+    file.write("ID,Name,Sequence,Model/Tag,Output_PDB,lDDT,Time\n")
+
+import os, sys, signal
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+import AlphaFold2
+predictions = AlphaFold2.predict_sequences(sequences=sequence,models= [1,2,3,4,5], nrecycles=3, scores.csv, nstruct=30, npy=True)
+
+
+
+
+print("Done")
