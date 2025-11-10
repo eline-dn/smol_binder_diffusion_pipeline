@@ -1,12 +1,14 @@
 # De novo Chemically induced dimer design pipeline using RFdiffusionAA
 Custom modifications of this pipeline https://github.com/ikalvet/heme_binder_diffusion from Indrek Kalvet, PhD (Institute for Protein Design, University of Washington).
-![image](https://github.com/ikalvet/heme_binder_diffusion/assets/30599647/6aa36676-9cba-4a9d-940c-a313920935f3)
 Purpose: to be able to design Chemically induced dimers
 
+steps 0 to 2 are done with the python script run.py, slightly adapted from the ipynb file (do not run as it is, proceed step by step
 
-Link:
 
-The included notebook `pipeline.ipynb` illustrates the design of heme-binding proteins, starting from minimal information (heme + substrate + CYS motif). It should work with minor modifications also for any other ligand.
+
+
+
+
 
 The pipeline consists of 7 steps:
 
