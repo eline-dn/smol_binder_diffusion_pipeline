@@ -3,6 +3,7 @@ Custom modifications of this pipeline https://github.com/ikalvet/heme_binder_dif
 Purpose: to be able to design Chemically induced dimers
 
 steps 0 to 2 are done with the python script run.py, slightly adapted from the ipynb file (do not run as it is, proceed step by step
+the main differences with the original pipeline is the ability to run it in my local env, and for the purpose of designing a binder to a target + small molecule (e.g. trimming of some of the diffusion and pMPNN reference files to filter the binders)
 
 
 
