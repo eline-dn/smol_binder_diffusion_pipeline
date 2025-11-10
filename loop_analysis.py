@@ -334,41 +334,38 @@ def predict_structure(
 #pdb_files=sys.argv[1] # path to the folder with the input/ reference pdb files, that we want to extract the binder structure from
 #output_folder=sys.argv[2] # path to the folder where the trimmed pdb should be store (= binder structure references)
 WDIR="/work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout"
-pl=PDBList()
-pdb_path=pl.retrieve_pdb_file("1Z9Y", file_format="pdb")
+os.chdir(WDIR)
 
 
 ####################################################extract sequence from chain A 
+
+from Bio.PDB import PDBList, PDBParser, PPBuilder
+
+pl = PDBList()
+pdb_path = pl.retrieve_pdb_file("1Z9Y", pdir=".", file_format="pdb")
+
 parser = PDBParser(QUIET=True)
 structure = parser.get_structure("complex", pdb_path)
-res_list=list()
 
-three_to_one_map = {
-    "ALA":"A","CYS":"C","ASP":"D","GLU":"E","PHE":"F","GLY":"G","HIS":"H","ILE":"I",
-    "LYS":"K","LEU":"L","MET":"M","ASN":"N","PRO":"P","GLN":"Q","ARG":"R","SER":"S",
-    "THR":"T","VAL":"V","TRP":"W","TYR":"Y"}
+ppb = PPBuilder()
+for pp in ppb.build_peptides(structure[0]["A"]):
+    seq = str(pp.get_sequence())[:261]
+    print(seq)
 
- for model in structure:
-   for chain in model:
-     if chain.id=="A":
-       # Get all residues in the chain
-       residues = list(chain.get_residues())
-        # Keep residues before index trim_length
-        for i, residue in enumerate(residues):
-          if is_aa(residue, standard=False): #i < trim_length and?
-            res_list.append(three_to_one_map[residue.resname])
-seq="".join(res_list)                  
+
 sequence=list(seq)
+
+
 ############################### repredict the structure with AF2
 with open(scores.csv, "a") as file:
     file.write("ID,Name,Sequence,Model/Tag,Output_PDB,lDDT,Time\n")
 
 import os, sys, signal
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-import AlphaFold2
-predictions = AlphaFold2.predict_sequences(sequences=sequence,models= [1,2,3,4,5], nrecycles=3, scores.csv, nstruct=30, npy=True)
+#import AlphaFold2
+predictions = predict_sequences(sequences=sequence,models= [1,2,3,4,5], nrecycles=3, scores.csv, nstruct=30, npy=True)
 
 
-
+print(predictions)
 
 print("Done")
