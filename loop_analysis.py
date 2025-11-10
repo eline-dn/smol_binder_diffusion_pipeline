@@ -363,7 +363,7 @@ with open(scores.csv, "a") as file:
 import os, sys, signal
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 #import AlphaFold2
-predictions = predict_sequences(sequences=sequence,models= [1,2,3,4,5], nrecycles=3, scores.csv, nstruct=30, npy=True)
+predictions = predict_sequences(sequences=sequence,models= [1,2,3,4,5], nrecycles=3, scores.csv, nstruct=3, npy=True)
 
 
 print(predictions)
