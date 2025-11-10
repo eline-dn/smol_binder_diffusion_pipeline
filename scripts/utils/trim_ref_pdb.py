@@ -41,7 +41,7 @@ def _copy_structure_with_only_chain(structure, chain_id):
     return sb.get_structure()
     
 
-def trim_pdb(input_pdb_path, output_pdb_path, trim_length=412):
+def trim_pdb(input_pdb_path, output_pdb_path, trim_length=410):
     """
     Trims the first N amino acids from a PDB file.
 
