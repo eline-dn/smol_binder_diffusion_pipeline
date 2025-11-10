@@ -21,7 +21,7 @@ extract loop plDDT => flexibility
 """
 #----------------------------------------
 # af helpers
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+sys.path.append(os.path.dirname(os.path.realpath("./scripts/af2/af2.py")))
 import mock
 import tempfile
 from typing import Dict
