@@ -28,8 +28,7 @@ import tempfile
 from typing import Dict
 from timeit import default_timer as timer
 
-SCRIPT_DIR = os.path.dirname(__file__)
-sys.path.append(f"{SCRIPT_DIR}/../../lib/alphafold")
+sys.path.append(f"{SCRIPT_DIR}/lib/alphafold")
 from alphafold.common import protein
 from alphafold.data import pipeline
 from alphafold.data import templates
