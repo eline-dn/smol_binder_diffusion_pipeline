@@ -46,10 +46,10 @@ PYTHON = {"diffusion": f"{CONDAPATH}/envs/diffusion/bin/python",
 username = getpass.getuser()  # your username on the running system
 EMAIL = "eline.denis@epfl.ch" # edit based on your organization. For Slurm job notifications.
 
-PROJECT = "CID_3DGQ"
+PROJECT = "CID_1Z9Y"
 
 ### Path where the jobs will be run and outputs dumped
-WDIR = "/work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout"
+WDIR = "/work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout"
 
 if not os.path.exists(WDIR):
     os.makedirs(WDIR, exist_ok=True)
@@ -62,7 +62,7 @@ USE_GPU_for_AF2 = True
 
 # Ligand information
 params = [f"{SCRIPT_DIR}/theozyme/HBA/HBA.params"]  # Rosetta params file(s)
-LIGAND = "EAA"
+LIGAND = "FUN"
 
 
 # which steps are done?
@@ -73,7 +73,8 @@ done={"0diffusion_setup":False,
 
 ## setting up diffusion run: doesn't run diffusion, just to set up the directories
 if not done["0diffusion_setup"]:
-  diffusion_inputs = glob.glob(f"{SCRIPT_DIR}/input/*.pdb")
+  #diffusion_inputs = glob.glob(f"{SCRIPT_DIR}/input/*.pdb")
+  diffusion_inputs=list("1Z9Y_clean.pdb")
   print(f"Found {len(diffusion_inputs)} PDB files")
 
   ## Setting up general settings for diffusion
@@ -187,12 +188,18 @@ if not done["0.1diffusion_analysis"]:
 
 # ----------------1: Running ProteinMPNN on diffused backbones ---------------------------------------------------
 
-## all pdbs and trbs have been copied to the /filtered_structures/
-# cp /work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/out/*.pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/filtered_structures
+
+# all pdbs and trbs have been copied to the /filtered_structures/
+#  cp /work/lpdi/users/eline/rf_diffusion_all_atom/output/1Z9Y/* /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/0_diffusion/filtered_structures
+# cp /work/lpdi/users/eline/rf_diffusion_all_atom/output/1Z9Y/*.pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/0_diffusion/filtered_structures
+
+# to start running the next steps 
+pattern = re.compile(r"t2_\d+_(2|[2-8]\d|89)\.pdb$")
+all_pdbs = glob.glob(f"{DIFFUSION_DIR}/filtered_structures/t2_*.pdb")
+diffused_backbones_good = [f for f in all_pdbs if pattern.search(f)]
 
 
-
-diffused_backbones_good = glob.glob(f"{DIFFUSION_DIR}/filtered_structures/*.pdb")
+#diffused_backbones_good = glob.glob(f"{DIFFUSION_DIR}/filtered_structures/*.pdb")
 assert len(diffused_backbones_good) > 0, "No good backbones found!"
 
 os.chdir(WDIR)
@@ -202,7 +209,7 @@ MPNN_DIR = f"{WDIR}/1_proteinmpnn"
 os.makedirs(MPNN_DIR, exist_ok=True)
 os.chdir(MPNN_DIR)
 
-done["1proteinmpnn"] = True
+done["1proteinmpnn"] = False 
 
 if not done["1proteinmpnn"]:
   # the creation of the mask dict from the trb file allow us to use pMPNN on the backbone pdb file from rf diff, only the binder will be redesigned
@@ -276,8 +283,8 @@ AF2_DIR = f"{WDIR}/2_af2"
 os.makedirs(AF2_DIR, exist_ok=True)
 os.chdir(AF2_DIR)
 
-done["2af2_binder_prediction"] = True
-done["2.1af2_trim"] = True
+done["2af2_binder_prediction"] = False
+done["2.1af2_trim"] = False
 
 if not done["2.1af2_trim"]:
   ## the pdbs need to be trimmed in order to keep only the "binder" part for the pMPNN sequence design (1) and alphafold binder reprediction (2)
@@ -302,8 +309,8 @@ if not done["2.1af2_trim"]:
           for line in lines:
               if line.startswith(">"):
                   if sequence: # If we have a sequence from a previous entry in this file
-                      # Trim the sequence and write to the new file
-                      trimmed_sequence = sequence[410:]
+                      # Trim the sequence and write to the new file, keep the binder only , which is here everything except the initil target of length 255 (the - around 200 isn't included in the rf diff aa output)
+                      trimmed_sequence = sequence[:-255]
                       outfile.write(header + trimmed_sequence + "\n")
                   header = line.strip() + "\n" # Store the new header
                   sequence = "" # Reset sequence for the new entry
@@ -312,7 +319,7 @@ if not done["2.1af2_trim"]:
 
           # Process the last sequence in the file
           if sequence:
-              trimmed_sequence = sequence[410:]
+              trimmed_sequence = sequence[:-255]
               outfile.write(header + trimmed_sequence + "\n")
 
       print(f"Processed and trimmed: {ff} -> {output_filename}")
