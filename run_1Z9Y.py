@@ -184,7 +184,8 @@ if not done["0.1diffusion_analysis"]:
 
 # ----------------1: Running ProteinMPNN on diffused backbones ---------------------------------------------------
 
-pattern = re.compile(r"t2_\d+_(2|[2-8]\d|89)\.pdb$")
+#pattern = re.compile(r"t2_\d+_(2|[2-8]\d|89)\.pdb$")
+pattern = re.compile(r"t2_\d+_(1|[3-9]|1[0-9]|9[0-9]|1[0-4][0-9]|150)\.pdb$")
 all_pdbs = glob.glob(f"{DIFFUSION_DIR}/filtered_structures/t2_*.pdb")
 diffused_backbones_good = [f for f in all_pdbs if pattern.search(f)]
 
@@ -196,7 +197,7 @@ MPNN_DIR = f"{WDIR}/1_proteinmpnn"
 os.makedirs(MPNN_DIR, exist_ok=True)
 os.chdir(MPNN_DIR)
 
-done["1proteinmpnn"] = True
+done["1proteinmpnn"] = False
 
 if not done["1proteinmpnn"]:
     """the creation of the mask dict from the trb file allow us to use pMPNN on the backbone pdb file from rf diff, only the binder will be redesigned.
@@ -220,10 +221,10 @@ if not done["1proteinmpnn"]:
     with open(cmds_filename_mpnn, "w") as file:
         for T in MPNN_temperatures:
             for f in diffused_backbones_good:
-                commands_mpnn.append(
+                commands_mpnn.append( ### !!!! here don't forget to change the output folder if needed!
                     f"{PYTHON['proteinMPNN']} {proteinMPNN_script} "
                     f"--model_type protein_mpnn --ligand_mpnn_use_atom_context 0 --file_ending _T{T} "
-                    "--fixed_residues_multi masked_pos.jsonl --out_folder ./ "
+                    "--fixed_residues_multi masked_pos.jsonl --out_folder ./part2 " 
                     f"--number_of_batches {MPNN_outputs_per_temperature} --temperature {T} "
                     f"--omit_AA {MPNN_omit_AAs} --pdb_path {f} "
                     f"--checkpoint_protein_mpnn {SCRIPT_DIR}/lib/LigandMPNN/model_params/proteinmpnn_v_48_020.pt\n"
@@ -268,12 +269,12 @@ os.makedirs(AF2_DIR, exist_ok=True)
 os.chdir(AF2_DIR)
 
 done["2af2_binder_prediction"] = False
-done["2.1af2_trim"] = True
+done["2.1af2_trim"] = False
 
 if not done["2.1af2_trim"]:
     ## the pdbs need to be trimmed in order to keep only the "binder" part for the pMPNN sequence design (1) and alphafold binder reprediction (2)
-    fasta_files = glob.glob(f"{MPNN_DIR}/seqs/*_T0.*.fa")
-    output_dir = f"{AF2_DIR}/trimmed_fastas_1"
+    fasta_files = glob.glob(f"{MPNN_DIR}/part2/seqs/*_T0.*.fa") ### output file
+    output_dir = f"{AF2_DIR}/trimmed_fastas_2"
     os.makedirs(output_dir, exist_ok=True)
 
     for ff in fasta_files:
@@ -301,7 +302,7 @@ if not done["2.1af2_trim"]:
 
 if (not done["2af2_binder_prediction"]) and done["2.1af2_trim"]:
   ### First collecting MPNN outputs and creating FASTA files for AF2 input
-  mpnn_fasta = utils.parse_fasta_files(glob.glob(f"{AF2_DIR}/trimmed_fastas_1/*.fa"))
+  mpnn_fasta = utils.parse_fasta_files(glob.glob(f"{AF2_DIR}/trimmed_fastas_2/*.fa"))
   mpnn_fasta = {k: seq.strip() for k, seq in mpnn_fasta.items() if "model_path" not in k}  # excluding the diffused poly-A sequence
   # Giving sequences unique names based on input PDB name, temperature, and sequence identifier
   mpnn_fasta = {k.split(",")[0]+"_"+k.split(",")[2].replace(" T=", "T")+"_0_"+k.split(",")[1].replace(" id=", ""): seq for k, seq in mpnn_fasta.items()}
