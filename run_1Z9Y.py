@@ -268,7 +268,7 @@ os.makedirs(AF2_DIR, exist_ok=True)
 os.chdir(AF2_DIR)
 
 done["2af2_binder_prediction"] = False
-done["2.1af2_trim"] = False
+done["2.1af2_trim"] = True
 
 if not done["2.1af2_trim"]:
     ## the pdbs need to be trimmed in order to keep only the "binder" part for the pMPNN sequence design (1) and alphafold binder reprediction (2)
@@ -305,22 +305,15 @@ if (not done["2af2_binder_prediction"]) and done["2.1af2_trim"]:
   mpnn_fasta = {k: seq.strip() for k, seq in mpnn_fasta.items() if "model_path" not in k}  # excluding the diffused poly-A sequence
   # Giving sequences unique names based on input PDB name, temperature, and sequence identifier
   mpnn_fasta = {k.split(",")[0]+"_"+k.split(",")[2].replace(" T=", "T")+"_0_"+k.split(",")[1].replace(" id=", ""): seq for k, seq in mpnn_fasta.items()}
-
   print(f"A total of {len(mpnn_fasta)} sequences will be predicted.")
-
   ## Splitting the MPNN sequences based on length
   ## and grouping them in smaller batches for each AF2 job
   ## Use group size of >40 when running on GPU. Also depends on how many sequences and resources you have.
-
-
   SEQUENCES_PER_AF2_JOB = 100  # GPU
   mpnn_fasta_split = utils.split_fasta_based_on_length(mpnn_fasta, SEQUENCES_PER_AF2_JOB, write_files=True)
-
   ## Setting up AlphaFold2 run
-
   AF2_recycles = 3
   AF2_models = "4"  # add other models to this string if needed, i.e. "3 4 5"
-
   commands_af2 = []
   cmds_filename_af2 = "commands_af2"
   with open(cmds_filename_af2, "w") as file:
@@ -329,7 +322,6 @@ if (not done["2af2_binder_prediction"]) and done["2.1af2_trim"]:
                               f"--af-nrecycles {AF2_recycles} --af-models {AF2_models} "
                               f"--fasta {ff} --scorefile {ff.replace('.fasta', '.csv')}\n")
           file.write(commands_af2[-1])
-
   print("Example AF2 command:")
   print(commands_af2[-1])
   print("Number of AF2 commands:")
@@ -342,8 +334,8 @@ if (not done["2af2_binder_prediction"]) and done["2.1af2_trim"]:
   submit_script = "submit_af2.sh"
   #if USE_GPU_for_AF2 is True:
   utils.create_slurm_submit_script(filename=submit_script, name="2_af2", mem="6g",
-                                      N_cores=2, gpu=True, partition="h100", time="50:00:00", email=EMAIL, array=len(commands_af2),
-                                      array_commandfile=cmds_filename_af2, group=29) ## don't forget to adjust group!
+                                      N_cores=2, gpu=True, partition="h100", time="30:00:00", email=EMAIL, array=len(commands_af2),
+                                      array_commandfile=cmds_filename_af2, group=24) ## don't forget to adjust group!
   # /!\ need to add:
   """
   module load gcc/13.2.0
