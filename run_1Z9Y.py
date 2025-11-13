@@ -183,10 +183,10 @@ if not done["0.1diffusion_analysis"]:
         (output, err) = p.communicate()
 
 # ----------------1: Running ProteinMPNN on diffused backbones ---------------------------------------------------
-
+#pdbs should be in /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/0_diffusion
 #pattern = re.compile(r"t2_\d+_(2|[2-8]\d|89)\.pdb$")
-pattern = re.compile(r"t2_\d+_(1|[3-9]|1[0-9]|9[0-9]|1[0-4][0-9]|150)\.pdb$")
-all_pdbs = glob.glob(f"{DIFFUSION_DIR}/filtered_structures/t2_*.pdb")
+pattern = re.compile(r"t2_\d+_(1|[3-9]|1[0-9]|9[0-9]|1[0-4][0-9])\.pdb$")
+all_pdbs = glob.glob(f"{DIFFUSION_DIR}/t2_*.pdb")
 diffused_backbones_good = [f for f in all_pdbs if pattern.search(f)]
 
 assert len(diffused_backbones_good) > 0, "No good backbones found!"
@@ -204,52 +204,52 @@ if not done["1proteinmpnn"]:
     Parsing diffusion output TRB files to extract fixed motif residues.
     These residues will not be redesigned with proteinMPNN
     """
-    mask_json_cmd = f"{PYTHON['general']} {SCRIPT_DIR}/scripts/design/make_maskdict_from_trb.py --out masked_pos.jsonl --trb"
-    for d in diffused_backbones_good:
-        mask_json_cmd += " " + d.replace(".pdb", ".trb")
+mask_json_cmd = f"{PYTHON['general']} {SCRIPT_DIR}/scripts/design/make_maskdict_from_trb.py --out masked_pos.jsonl --trb"
+for d in diffused_backbones_good:
+    mask_json_cmd += " " + d.replace(".pdb", ".trb")
 
-    p = subprocess.Popen(mask_json_cmd, shell=True)
-    (output, err) = p.communicate()
-    assert os.path.exists("masked_pos.jsonl"), "Failed to create masked positions JSONL file"
+p = subprocess.Popen(mask_json_cmd, shell=True)
+(output, err) = p.communicate()
+assert os.path.exists("masked_pos.jsonl"), "Failed to create masked positions JSONL file"
 
-    MPNN_temperatures = [0.1, 0.2, 0.3]
-    MPNN_outputs_per_temperature = 5
-    MPNN_omit_AAs = "CM"
+MPNN_temperatures = [0.1, 0.2, 0.3]
+MPNN_outputs_per_temperature = 5
+MPNN_omit_AAs = "CM"
 
-    commands_mpnn = []
-    cmds_filename_mpnn = "commands_mpnn"
-    with open(cmds_filename_mpnn, "w") as file:
-        for T in MPNN_temperatures:
-            for f in diffused_backbones_good:
-                commands_mpnn.append( ### !!!! here don't forget to change the output folder if needed!
-                    f"{PYTHON['proteinMPNN']} {proteinMPNN_script} "
-                    f"--model_type protein_mpnn --ligand_mpnn_use_atom_context 0 --file_ending _T{T} "
-                    "--fixed_residues_multi masked_pos.jsonl --out_folder ./part2 " 
-                    f"--number_of_batches {MPNN_outputs_per_temperature} --temperature {T} "
-                    f"--omit_AA {MPNN_omit_AAs} --pdb_path {f} "
-                    f"--checkpoint_protein_mpnn {SCRIPT_DIR}/lib/LigandMPNN/model_params/proteinmpnn_v_48_020.pt\n"
-                )
-                file.write(commands_mpnn[-1])
-    print("Number of proteinMPNN commands:", len(commands_mpnn))
-    print("Example MPNN command:")
-    print(commands_mpnn[-1])
+commands_mpnn = []
+cmds_filename_mpnn = "commands_mpnn"
+with open(cmds_filename_mpnn, "w") as file:
+    for T in MPNN_temperatures:
+        for f in diffused_backbones_good:
+            commands_mpnn.append( ### !!!! here don't forget to change the output folder if needed!
+                f"{PYTHON['proteinMPNN']} {proteinMPNN_script} "
+                f"--model_type protein_mpnn --ligand_mpnn_use_atom_context 0 --file_ending _T{T} "
+                "--fixed_residues_multi masked_pos.jsonl --out_folder ./part2 " 
+                f"--number_of_batches {MPNN_outputs_per_temperature} --temperature {T} "
+                f"--omit_AA {MPNN_omit_AAs} --pdb_path {f} "
+                f"--checkpoint_protein_mpnn {SCRIPT_DIR}/lib/LigandMPNN/model_params/proteinmpnn_v_48_020.pt\n"
+            )
+            file.write(commands_mpnn[-1])
+print("Number of proteinMPNN commands:", len(commands_mpnn))
+print("Example MPNN command:")
+print(commands_mpnn[-1])
 
-    submit_script = "submit_mpnn.sh"
-    utils.create_slurm_submit_script(
-        filename=submit_script,
-        name="1_proteinmpnn",
-        mem="4g",
-        N_cores=1,
-        time="0:35:00",
-        partition="h100",
-        email=EMAIL,
-        array=len(commands_mpnn),
-        array_commandfile=cmds_filename_mpnn,
-        group=100,
-    )
+submit_script = "submit_mpnn.sh"
+utils.create_slurm_submit_script(
+    filename=submit_script,
+    name="1_proteinmpnn",
+    mem="4g",
+    N_cores=1,
+    time="0:45:00",
+    partition="h100",
+    email=EMAIL,
+    array=len(commands_mpnn),
+    array_commandfile=cmds_filename_mpnn,
+    group=150,
+)
 
-    p = subprocess.Popen(["sbatch", submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    (output, err) = p.communicate()
+p = subprocess.Popen(["sbatch", submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+(output, err) = p.communicate()
 
 MPNN_DIR = f"{WDIR}/1_proteinmpnn"
 os.chdir(MPNN_DIR)
