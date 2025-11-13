@@ -1,4 +1,5 @@
 import os, sys, glob
+import re
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -15,36 +16,33 @@ import Bio.PDB
 ### Path to this cloned GitHub repo:
 SCRIPT_DIR = "/work/lpdi/users/eline/smol_binder_diffusion_pipeline"  # edit this to the GitHub repo path. Throws an error by default.
 assert os.path.exists(SCRIPT_DIR)
-sys.path.append(SCRIPT_DIR+"/scripts/utils")
+sys.path.append(SCRIPT_DIR + "/scripts/utils")
 import utils
 
 
 # SETUP-----------------------------------------------------
 
 diffusion_script = "/work/lpdi/users/eline/rf_diffusion_all_atom/run_inference.py"  # edit this
-#inpaint_script = "PATH/TO/RFDesign/inpainting/inpaint.py"  # edit this if needed
+# inpaint_script = "PATH/TO/RFDesign/inpainting/inpaint.py"  # edit this if needed
 proteinMPNN_script = f"{SCRIPT_DIR}/lib/LigandMPNN/run.py"  # from submodule
 AF2_script = f"{SCRIPT_DIR}/scripts/af2/af2.py"  # from submodule
 
 
-
 ### Python and/or Apptainer executables needed for running the jobs
 ### Please provide paths to executables that are able to run the different tasks.
-### They can all be the same if you have an environment with all of the ncessary Python modules in one
+### They can all be the same if you have an environment with all of the necessary Python modules in one
 
-# If your added Apptainer does not execute scripts directly,
-# try adding 'apptainer run' or 'apptainer run --nv' (for GPU) in front of the command
-
-CONDAPATH = "/work/lpdi/users/eline/miniconda3"   # edit this depending on where your Conda environments live
-PYTHON = {"diffusion": f"{CONDAPATH}/envs/diffusion/bin/python",
-          #"af2":"/work/lpdi/users/mpacesa/Pipelines/miniforge3/envs/BindCraft_kuma/bin/python",
-          "af2": f"{CONDAPATH}/envs/mlfold/bin/python",
-          "proteinMPNN": f"{CONDAPATH}/envs/diffusion/bin/python",
-          "general": f"{CONDAPATH}/envs/diffusion/bin/python"}
-
+CONDAPATH = "/work/lpdi/users/eline/miniconda3"  # edit this depending on where your Conda environments live
+PYTHON = {
+    "diffusion": f"{CONDAPATH}/envs/diffusion/bin/python",
+    # "af2":"/work/lpdi/users/mpacesa/Pipelines/miniforge3/envs/BindCraft_kuma/bin/python",
+    "af2": f"{CONDAPATH}/envs/mlfold/bin/python",
+    "proteinMPNN": f"{CONDAPATH}/envs/diffusion/bin/python",
+    "general": f"{CONDAPATH}/envs/diffusion/bin/python",
+}
 
 username = getpass.getuser()  # your username on the running system
-EMAIL = "eline.denis@epfl.ch" # edit based on your organization. For Slurm job notifications.
+EMAIL = "eline.denis@epfl.ch"  # edit based on your organization. For Slurm job notifications.
 
 PROJECT = "CID_1Z9Y"
 
@@ -59,68 +57,62 @@ print(f"Working directory: {WDIR}")
 USE_GPU_for_AF2 = True
 
 
-
 # Ligand information
 params = [f"{SCRIPT_DIR}/theozyme/HBA/HBA.params"]  # Rosetta params file(s)
 LIGAND = "FUN"
 
 
 # which steps are done?
-done={"0diffusion_setup":False,
-      "0diffusion":True}
+done = {
+    "0diffusion_setup": False,
+    "0diffusion": True,
+}
 
 # ----------------------------------------0: diffusion run------------------------------------------------------------------------------------------------------
 
 ## setting up diffusion run: doesn't run diffusion, just to set up the directories
 if not done["0diffusion_setup"]:
-  #diffusion_inputs = glob.glob(f"{SCRIPT_DIR}/input/*.pdb")
-  diffusion_inputs=list()
-  diffusion_inputs.append("1Z9Y_clean.pdb")
-  print(f"Found {len(diffusion_inputs)} PDB files")
+    # diffusion_inputs = glob.glob(f"{SCRIPT_DIR}/input/*.pdb")
+    diffusion_inputs = list()
+    diffusion_inputs.append("1Z9Y_clean.pdb")
+    print(f"Found {len(diffusion_inputs)} PDB files")
 
-  ## Setting up general settings for diffusion
-  DIFFUSION_DIR = f"{WDIR}/0_diffusion"
-  if not os.path.exists(DIFFUSION_DIR):
-      os.makedirs(DIFFUSION_DIR, exist_ok=False)
+    ## Setting up general settings for diffusion
+    DIFFUSION_DIR = f"{WDIR}/0_diffusion"
+    if not os.path.exists(DIFFUSION_DIR):
+        os.makedirs(DIFFUSION_DIR, exist_ok=False)
 
-  os.chdir(DIFFUSION_DIR)
-  ## Setting up diffusion commands based on the input PDB file(s)
-  ## Diffusion jobs are run in separate directories for each input PDB
-  diffusion_rundirs = []
-  #inference.output_prefix='./out/{pdbname}_dif' in diffusion_dir
-  ## Creating a Slurm submit script
-  ## adjust time depending on number of designs and available hardware
+    os.chdir(DIFFUSION_DIR)
+    ## Setting up diffusion commands based on the input PDB file(s)
+    ## Diffusion jobs are run in separate directories for each input PDB
+    diffusion_rundirs = []
+    # inference.output_prefix='./out/{pdbname}_dif' in diffusion_dir
+    ## Creating a Slurm submit script
+    ## adjust time depending on number of designs and available hardware
 
-  ## If you're done with diffusion and happy with the outputs then mark it as done
-  DIFFUSION_DIR = f"{WDIR}/0_diffusion"
-  os.chdir(DIFFUSION_DIR)
+    ## If you're done with diffusion and happy with the outputs then mark it as done
+    DIFFUSION_DIR = f"{WDIR}/0_diffusion"
+    os.chdir(DIFFUSION_DIR)
 
-  if not os.path.exists(DIFFUSION_DIR+"/.done"):
-      with open(f"{DIFFUSION_DIR}/.done", "w") as file:
-          file.write(f"Run user: {username}\n")
+    if not os.path.exists(DIFFUSION_DIR + "/.done"):
+        with open(f"{DIFFUSION_DIR}/.done", "w") as file:
+            file.write(f"Run user: {username}\n")
 
-  ## diffusion run if not done
-  if not done["0diffusion"]:
-    """ in the shell:sbatch nd[1-5]run_inference.slurm
+    ## diffusion run if not done
+    if not done["0diffusion"]:
+        """ in the shell:sbatch nd[1-5]run_inference.slurm
 
-    mkdir /work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/out/unidealized
-    cp /work/lpdi/users/eline/rf_diffusion_all_atom/output/CID/unidealized/* /work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/out/unidealized
+        mkdir /work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/out/unidealized
+        cp /work/lpdi/users/eline/rf_diffusion_all_atom/output/CID/unidealized/* /work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/out/unidealized
 
-    diff_output_dir="/work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/out" # contains all the backbones
+        diff_output_dir="/work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/out" # contains all the backbones
 
-    """
-
+        """
 
 # ------------------------------------0.1 diffusion output analysis: ---------------------------------------------------------------------------------------------------------------------------
-done["0.1diffusion_analysis"]=True
+done["0.1diffusion_analysis"] = True
 
 ## set --analyze to True to avoid filtering the binders, only compute the scores (will allow us to evaluate the diff diffusion input parameters)
-## to try to fix error?
-# If your added Apptainer does not execute scripts directly,
-# try adding 'apptainer run' or 'apptainer run --nv' (for GPU) in front of the command
-
-### Analyzing diffusion outputs for clashes, ligand burial and scaffold quality
-## If it's running too slowly consider increasing --nproc
 
 analysis_script = f"{SCRIPT_DIR}/scripts/diffusion_analysis/process_diffusion_outputs.py"
 diffusion_rundirs = ["3DGQ_renumbered"]
@@ -128,152 +120,145 @@ diffusion_outputs = []
 diffusion_trb = []
 for d in diffusion_rundirs:
     diffusion_outputs += glob.glob(f"/work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/out/*.pdb")
-    #diffusion_trb += glob.glob(f"/work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/out/*.trb")
-
+    # diffusion_trb += glob.glob(f"/work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/out/*.trb")
 
 if not done["0.1diffusion_analysis"]:
-  dif_analysis_cmd_dict = {"--pdb": " ".join(diffusion_outputs),
-                          #"--trb":" ".join(diffusion_trb), # should be automatically loaded in the script
-                          #"--ref": f"{SCRIPT_DIR}/input/3DGQ_renumbered.pdb",
-                          "--params": " ".join(params),
-                          "--term_limit": "15.0",
-                          "--SASA_limit": "0.3",  # Highest allowed relative SASA of ligand
-                          "--loop_limit": "0.4",  # Fraction of backbone that can be loopy
-                          #"--ref_catres": "A15",  # Position of CYS in diffusion input
-                          "--rethread": True,
-                          "--fix": True,
-                          "--exclude_clash_atoms": "O1",  # Ligand atoms excluded from clashchecking because they are flexible
-                          "--ligand_exposed_atoms": None, #"C10",  # Ligand atoms that need to be more exposed
-                          "--exposed_atom_SASA": "00.0",  # minimum absolute SASA for exposed ligand atoms
-                          "--longest_helix": "30",
-                          "--rog": "30.0",
-                          "--partial": None,
-                          "--outdir": "filtered_structures1",
-                          #"--traj": "0/30",  # Also random 5 models are taken from the last 30 steps of the diffusion trajectory
-                          "--trb": None,
-                          "--analyze": True,
-                          "--nproc": "1"}
+    dif_analysis_cmd_dict = {
+        "--pdb": " ".join(diffusion_outputs),
+        # "--trb":" ".join(diffusion_trb),
+        # "--ref": f"{SCRIPT_DIR}/input/3DGQ_renumbered.pdb",
+        "--params": " ".join(params),
+        "--term_limit": "15.0",
+        "--SASA_limit": "0.3",
+        "--loop_limit": "0.4",
+        # "--ref_catres": "A15",
+        "--rethread": True,
+        "--fix": True,
+        "--exclude_clash_atoms": "O1",
+        "--ligand_exposed_atoms": None,
+        "--exposed_atom_SASA": "00.0",
+        "--longest_helix": "30",
+        "--rog": "30.0",
+        "--partial": None,
+        "--outdir": "filtered_structures1",
+        # "--traj": "0/30",
+        "--trb": None,
+        "--analyze": True,
+        "--nproc": "1",
+    }
 
-  analysis_command = f"{PYTHON['general']} {analysis_script}"
-  for k, val in dif_analysis_cmd_dict.items():
-      if val is not None:
-          if isinstance(val, list):
-              analysis_command += f" {k}"
-              analysis_command += " " + " ".join(val)
-          elif isinstance(val, bool):
-              if val == True:
-                  analysis_command += f" {k}"
-          else:
-              analysis_command += f" {k} {val}"
-          #print(k, val)
+    analysis_command = f"{PYTHON['general']} {analysis_script}"
+    for k, val in dif_analysis_cmd_dict.items():
+        if val is not None:
+            if isinstance(val, list):
+                analysis_command += f" {k}"
+                analysis_command += " " + " ".join(val)
+            elif isinstance(val, bool):
+                if val is True:
+                    analysis_command += f" {k}"
+            else:
+                analysis_command += f" {k} {val}"
 
-  if len(diffusion_outputs) < 100:
-      ## Analyzing locally
-      p = subprocess.Popen(analysis_command, shell=True)
-      (output, err) = p.communicate()
-  else:
-      ## Too many structures to analyze.
-      ## Running the analysis as a SLURM job.
-      submit_script = "submit_diffusion_analysis.sh"
-      utils.create_slurm_submit_script(filename=submit_script, name="diffusion_analysis", gpu=True,
-                                      mem="8g", N_cores=dif_analysis_cmd_dict["--nproc"], time="0:20:00", email=EMAIL,
-                                      command=analysis_command, outfile_name="output_analysis", partition="h100")
-      #just skip this part
-      # then run the script:
-      p = subprocess.Popen(['sbatch', submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-      (output, err) = p.communicate()
-      # or exit and run in the shell with sbatch
-
-
-
+    if len(diffusion_outputs) < 100:
+        ## Analyzing locally
+        p = subprocess.Popen(analysis_command, shell=True)
+        (output, err) = p.communicate()
+    else:
+        ## Too many structures to analyze.
+        ## Running the analysis as a SLURM job.
+        submit_script = "submit_diffusion_analysis.sh"
+        utils.create_slurm_submit_script(
+            filename=submit_script,
+            name="diffusion_analysis",
+            gpu=True,
+            mem="8g",
+            N_cores=dif_analysis_cmd_dict["--nproc"],
+            time="0:20:00",
+            email=EMAIL,
+            command=analysis_command,
+            outfile_name="output_analysis",
+            partition="h100",
+        )
+        p = subprocess.Popen(["sbatch", submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (output, err) = p.communicate()
 
 # ----------------1: Running ProteinMPNN on diffused backbones ---------------------------------------------------
-
-
-# all pdbs and trbs have been copied to the /filtered_structures/
-#  cp /work/lpdi/users/eline/rf_diffusion_all_atom/output/1Z9Y/* /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/0_diffusion/filtered_structures
-# cp /work/lpdi/users/eline/rf_diffusion_all_atom/output/1Z9Y/*.pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/0_diffusion/filtered_structures
-
-# to start running the next steps 
-pattern = re.compile(r"t2_\d+_(2|[2-8]\d|89)\.pdb$")
-all_pdbs = glob.glob(f"{DIFFUSION_DIR}/filtered_structures/t2_*.pdb")
+#pdbs should be in /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/0_diffusion
+#pattern = re.compile(r"t2_\d+_(2|[2-8]\d|89)\.pdb$")
+pattern = re.compile(r"t2_\d+_(1|[3-9]|1[0-9]|9[0-9]|1[0-4][0-9])\.pdb$")
+all_pdbs = glob.glob(f"{DIFFUSION_DIR}/t2_*.pdb")
 diffused_backbones_good = [f for f in all_pdbs if pattern.search(f)]
 
-
-#diffused_backbones_good = glob.glob(f"{DIFFUSION_DIR}/filtered_structures/*.pdb")
 assert len(diffused_backbones_good) > 0, "No good backbones found!"
 
 os.chdir(WDIR)
-
 
 MPNN_DIR = f"{WDIR}/1_proteinmpnn"
 os.makedirs(MPNN_DIR, exist_ok=True)
 os.chdir(MPNN_DIR)
 
-done["1proteinmpnn"] = True 
+done["1proteinmpnn"] = False
 
 if not done["1proteinmpnn"]:
-          """the creation of the mask dict from the trb file allow us to use pMPNN on the backbone pdb file from rf diff, only the binder will be redesigned. 
-          Parsing diffusion output TRB files to extract fixed motif residues. 
-          These residues will not be redesigned with proteinMPNN
-          """
-          mask_json_cmd = f"{PYTHON['general']} {SCRIPT_DIR}/scripts/design/make_maskdict_from_trb.py --out masked_pos.jsonl --trb"
-          for d in diffused_backbones_good:
-                    mask_json_cmd += " " + d.replace(".pdb", ".trb")
+    """the creation of the mask dict from the trb file allow us to use pMPNN on the backbone pdb file from rf diff, only the binder will be redesigned.
+    Parsing diffusion output TRB files to extract fixed motif residues.
+    These residues will not be redesigned with proteinMPNN
+    """
+mask_json_cmd = f"{PYTHON['general']} {SCRIPT_DIR}/scripts/design/make_maskdict_from_trb.py --out masked_pos.jsonl --trb"
+for d in diffused_backbones_good:
+    mask_json_cmd += " " + d.replace(".pdb", ".trb")
 
-          p = subprocess.Popen(mask_json_cmd, shell=True)
-          (output, err) = p.communicate()
-          assert os.path.exists("masked_pos.jsonl"), "Failed to create masked positions JSONL file"
+p = subprocess.Popen(mask_json_cmd, shell=True)
+(output, err) = p.communicate()
+assert os.path.exists("masked_pos.jsonl"), "Failed to create masked positions JSONL file"
 
+MPNN_temperatures = [0.1, 0.2, 0.3]
+MPNN_outputs_per_temperature = 5
+MPNN_omit_AAs = "CM"
 
-          ### Setting up proteinMPNN run commands
-          ## We're doing design with 3 temperatures, and 5 sequences each.
-          ## This usually gives decent success with designable backbones.
-          ## For more complicated cases consider doing >100 sequences.
+commands_mpnn = []
+cmds_filename_mpnn = "commands_mpnn"
+with open(cmds_filename_mpnn, "w") as file:
+    for T in MPNN_temperatures:
+        for f in diffused_backbones_good:
+            commands_mpnn.append( ### !!!! here don't forget to change the output folder if needed!
+                f"{PYTHON['proteinMPNN']} {proteinMPNN_script} "
+                f"--model_type protein_mpnn --ligand_mpnn_use_atom_context 0 --file_ending _T{T} "
+                "--fixed_residues_multi masked_pos.jsonl --out_folder ./part2 " 
+                f"--number_of_batches {MPNN_outputs_per_temperature} --temperature {T} "
+                f"--omit_AA {MPNN_omit_AAs} --pdb_path {f} "
+                f"--checkpoint_protein_mpnn {SCRIPT_DIR}/lib/LigandMPNN/model_params/proteinmpnn_v_48_020.pt\n"
+            )
+            file.write(commands_mpnn[-1])
+print("Number of proteinMPNN commands:", len(commands_mpnn))
+print("Example MPNN command:")
+print(commands_mpnn[-1])
 
-          MPNN_temperatures = [0.1, 0.2, 0.3]
-          MPNN_outputs_per_temperature = 5
-          MPNN_omit_AAs = "CM"
-          
-          commands_mpnn = []
-          cmds_filename_mpnn = "commands_mpnn"
-          with open(cmds_filename_mpnn, "w") as file:
-                    for T in MPNN_temperatures:
-                              for f in diffused_backbones_good:
-                                        commands_mpnn.append(f"{PYTHON['proteinMPNN']} {proteinMPNN_script} "
-                                            f"--model_type protein_mpnn --ligand_mpnn_use_atom_context 0 --file_ending _T{T} "
-                                            "--fixed_residues_multi masked_pos.jsonl --out_folder ./ "
-                                            f"--number_of_batches {MPNN_outputs_per_temperature} --temperature {T} "
-                                            f"--omit_AA {MPNN_omit_AAs} --pdb_path {f} "
-                                            f"--checkpoint_protein_mpnn {SCRIPT_DIR}/lib/LigandMPNN/model_params/proteinmpnn_v_48_020.pt\n")
-                                        file.write(commands_mpnn[-1])
-          print("Number of proteinMPNN commands:", len(commands_mpnn))
-          print("Example MPNN command:")
-          print(commands_mpnn[-1])
+submit_script = "submit_mpnn.sh"
+utils.create_slurm_submit_script(
+    filename=submit_script,
+    name="1_proteinmpnn",
+    mem="4g",
+    N_cores=1,
+    time="0:45:00",
+    partition="h100",
+    email=EMAIL,
+    array=len(commands_mpnn),
+    array_commandfile=cmds_filename_mpnn,
+    group=150,
+)
 
-          ### Running proteinMPNN with Slurm.
-          ### Grouping jobs with 100 commands per one array job.
-          submit_script = "submit_mpnn.sh"
-          utils.create_slurm_submit_script(filename=submit_script, name="1_proteinmpnn", mem="4g",
-                                  N_cores=1, time="0:35:00", partition= "h100", email=EMAIL, array=len(commands_mpnn),
-                                  array_commandfile=cmds_filename_mpnn, group=100)
+p = subprocess.Popen(["sbatch", submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+(output, err) = p.communicate()
 
-  #if False: #not os.path.exists(MPNN_DIR+"/.done"):
-          p = subprocess.Popen(['sbatch', submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-          (output, err) = p.communicate()
-
-# mark as done:
-
-## If you're done with diffusion and happy with the outputs then mark it as done
 MPNN_DIR = f"{WDIR}/1_proteinmpnn"
 os.chdir(MPNN_DIR)
 
-if not os.path.exists(MPNN_DIR+"/.done"):
-  with open(f"{MPNN_DIR}/.done", "w") as file:
-    file.write(f"Run user: {username}\n")
+if not os.path.exists(MPNN_DIR + "/.done"):
+    with open(f"{MPNN_DIR}/.done", "w") as file:
+        file.write(f"Run user: {username}\n")
 
 done["1proteinmpnn"] = True
-
 
 #--------------------------------------------------2: Running AlphaFold2-------------------------------------------------
 
@@ -287,94 +272,76 @@ done["2af2_binder_prediction"] = False
 done["2.1af2_trim"] = False
 
 if not done["2.1af2_trim"]:
-  ## the pdbs need to be trimmed in order to keep only the "binder" part for the pMPNN sequence design (1) and alphafold binder reprediction (2)
-  # trim PDBs and fastas and store them in "{DIFFUSION_DIR}/binder_only_structures"
-  # sequences from {WDIR}/1_proteinmpnn/seqs/
-  fasta_files=glob.glob(f"{MPNN_DIR}/seqs/*_T0.*.fa")
-  output_dir = f"{AF2_DIR}/trimmed_fastas"
+    ## the pdbs need to be trimmed in order to keep only the "binder" part for the pMPNN sequence design (1) and alphafold binder reprediction (2)
+fasta_files = glob.glob(f"{MPNN_DIR}/part2/seqs/*_T0.*.fa") ### output file
+output_dir = f"{AF2_DIR}/trimmed_fastas_2"
+os.makedirs(output_dir, exist_ok=True)
 
-  # Create the output directory if it doesn't exist
-  os.makedirs(output_dir, exist_ok=True)
+for ff in fasta_files:
+    with open(ff, "r") as f:
+        lines = f.readlines()
+    header = ""
+    sequence = ""
+    output_filename = os.path.join(output_dir, os.path.basename(ff))
+    with open(output_filename, "w") as outfile:
+        for line in lines:
+            if line.startswith(">"):
+                if sequence:
+                    trimmed_sequence = sequence[:-256]
+                    outfile.write(header + trimmed_sequence + "\n")
+                header = line.strip() + "\n"
+                sequence = ""
+            else:
+                sequence += line.strip()
+        if sequence:
+            trimmed_sequence = sequence[:-256]
+            outfile.write(header + trimmed_sequence + "\n")
+    print(f"Processed and trimmed: {ff} -> {output_filename}")
 
-  for ff in fasta_files:
-      with open(ff, "r") as f:
-          lines = f.readlines()
-
-      header = ""
-      sequence = ""
-      # Construct the output filename with the new directory and original filename
-      output_filename = os.path.join(output_dir, os.path.basename(ff))
-
-      with open(output_filename, "w") as outfile:
-          for line in lines:
-              if line.startswith(">"):
-                  if sequence: # If we have a sequence from a previous entry in this file
-                      # Trim the sequence and write to the new file, keep the binder only , which is here everything except the initil target of length 255 (the - around 200 isn't included in the rf diff aa output)
-                      trimmed_sequence = sequence[:-255]
-                      outfile.write(header + trimmed_sequence + "\n")
-                  header = line.strip() + "\n" # Store the new header
-                  sequence = "" # Reset sequence for the new entry
-              else:
-                  sequence += line.strip() # Append sequence lines
-
-          # Process the last sequence in the file
-          if sequence:
-              trimmed_sequence = sequence[:-255]
-              outfile.write(header + trimmed_sequence + "\n")
-
-      print(f"Processed and trimmed: {ff} -> {output_filename}")
-
-  done["2.1af2_trim"] = True
+    done["2.1af2_trim"] = True
 
 if (not done["2af2_binder_prediction"]) and done["2.1af2_trim"]:
   ### First collecting MPNN outputs and creating FASTA files for AF2 input
-  mpnn_fasta = utils.parse_fasta_files(glob.glob(f"{AF2_DIR}/trimmed_fastas/*.fa"))
-  mpnn_fasta = {k: seq.strip() for k, seq in mpnn_fasta.items() if "model_path" not in k}  # excluding the diffused poly-A sequence
-  # Giving sequences unique names based on input PDB name, temperature, and sequence identifier
-  mpnn_fasta = {k.split(",")[0]+"_"+k.split(",")[2].replace(" T=", "T")+"_0_"+k.split(",")[1].replace(" id=", ""): seq for k, seq in mpnn_fasta.items()}
+mpnn_fasta = utils.parse_fasta_files(glob.glob(f"{AF2_DIR}/trimmed_fastas_2/*.fa"))
+mpnn_fasta = {k: seq.strip() for k, seq in mpnn_fasta.items() if "model_path" not in k}  # excluding the diffused poly-A sequence
+# Giving sequences unique names based on input PDB name, temperature, and sequence identifier
+mpnn_fasta = {k.split(",")[0]+"_"+k.split(",")[2].replace(" T=", "T")+"_0_"+k.split(",")[1].replace(" id=", ""): seq for k, seq in mpnn_fasta.items()}
+print(f"A total of {len(mpnn_fasta)} sequences will be predicted.")
+## Splitting the MPNN sequences based on length
+## and grouping them in smaller batches for each AF2 job
+## Use group size of >40 when running on GPU. Also depends on how many sequences and resources you have.
+SEQUENCES_PER_AF2_JOB = 100  # GPU
+mpnn_fasta_split = utils.split_fasta_based_on_length(mpnn_fasta, SEQUENCES_PER_AF2_JOB, write_files=True)
+## Setting up AlphaFold2 run
+AF2_recycles = 3
+AF2_models = "4"  # add other models to this string if needed, i.e. "3 4 5"
+commands_af2 = []
+cmds_filename_af2 = "commands_af2"
+with open(cmds_filename_af2, "w") as file:
+    for ff in glob.glob("*.fasta"):
+        commands_af2.append(f"{PYTHON['af2']} {AF2_script} "
+                          f"--af-nrecycles {AF2_recycles} --af-models {AF2_models} "
+                          f"--fasta {ff} --scorefile {ff.replace('.fasta', '.csv')}\n")
+        file.write(commands_af2[-1])
 
-  print(f"A total of {len(mpnn_fasta)} sequences will be predicted.")
-
-  ## Splitting the MPNN sequences based on length
-  ## and grouping them in smaller batches for each AF2 job
-  ## Use group size of >40 when running on GPU. Also depends on how many sequences and resources you have.
-
-
-  SEQUENCES_PER_AF2_JOB = 100  # GPU
-  mpnn_fasta_split = utils.split_fasta_based_on_length(mpnn_fasta, SEQUENCES_PER_AF2_JOB, write_files=True)
-
-  ## Setting up AlphaFold2 run
-
-  AF2_recycles = 3
-  AF2_models = "4"  # add other models to this string if needed, i.e. "3 4 5"
-
-  commands_af2 = []
-  cmds_filename_af2 = "commands_af2"
-  with open(cmds_filename_af2, "w") as file:
-      for ff in glob.glob("*.fasta"):
-          commands_af2.append(f"{PYTHON['af2']} {AF2_script} "
-                              f"--af-nrecycles {AF2_recycles} --af-models {AF2_models} "
-                              f"--fasta {ff} --scorefile {ff.replace('.fasta', '.csv')}\n")
-          file.write(commands_af2[-1])
-
-  print("Example AF2 command:")
-  print(commands_af2[-1])
-  print("Number of AF2 commands:")
-  print(len(commands_af2))
+print("Example AF2 command:")
+print(commands_af2[-1])
+print("Number of AF2 commands:")
+print(len(commands_af2))
 
   ### Running AF2 with Slurm.
   ### Running jobs on the GPU. It takes ~10 minutes per sequence
   ###
 
-  submit_script = "submit_af2.sh"
-  #if USE_GPU_for_AF2 is True:
-  utils.create_slurm_submit_script(filename=submit_script, name="2_af2", mem="6g",
-                                      N_cores=2, gpu=True, partition="h100", time="50:00:00", email=EMAIL, array=len(commands_af2),
-                                      array_commandfile=cmds_filename_af2, group=29) ## don't forget to adjust group!
+submit_script = "submit_af2.sh"
+#if USE_GPU_for_AF2 is True:
+utils.create_slurm_submit_script(filename=submit_script, name="2_af2", mem="6g",
+                                      N_cores=2, gpu=True, partition="h100", time="30:00:00", email=EMAIL, array=len(commands_af2),
+                                      array_commandfile=cmds_filename_af2, group=25) ## don't forget to adjust group!
   # /!\ need to add:
   """
-  module load gcc/13.2.0
-  module load cuda/12.4.1
+module load gcc/13.2.0
+module load cuda/12.4.1
   """
   # to the submit script before the commands
   #if True: #not os.path.exists(AF2_DIR+"/.done"):
@@ -439,7 +406,7 @@ done["trim_pdb"]=True
 if not done["trim_pdb"]:
   ## need to trim the reference pdb files to compare binder wth binder, without the target + ligand:
   # remove up to aa 410 + ligand at the end (= extract chain A only)
-  trim_cmd=f"{PYTHON['general']} {SCRIPT_DIR}/scripts/utils/trim_ref_pdb.py {DIFFUSION_DIR}/filtered_structures {DIFFUSION_DIR}/filtered_structures/bindersonly "
+  trim_cmd=f"{PYTHON['general']} {SCRIPT_DIR}/scripts/utils/trim_ref_pdb_nterm.py {DIFFUSION_DIR}/ {DIFFUSION_DIR}/filtered_structures/bindersonly "
   submit_script = "submit_ref_extraction.sh"
   utils.create_slurm_submit_script(filename=submit_script, name="binder_extraction",
                                       mem="16g", N_cores=8, partition="h100", time="0:05:00", email=EMAIL,
