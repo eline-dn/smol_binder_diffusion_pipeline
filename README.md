@@ -1,4 +1,7 @@
-# De novo Chemically induced dimer design pipeline using RFdiffusionAA
+# De novo Chemically induced dimer design pipeline using RFdiffusionAA, pMPNN & co
+
+*Designing binders for protein+ ligand complexes*
+
 Custom modifications of this pipeline https://github.com/ikalvet/heme_binder_diffusion from Indrek Kalvet, PhD (Institute for Protein Design, University of Washington).
 
 Their pipeline consists of 7 steps:
@@ -11,11 +14,15 @@ Their pipeline consists of 7 steps:
 6) Alphafold2-predicted models are relaxed with the ligand and analyzed
 
 Ours will be a bit different, in order to be able to design Chemically induced dimers: Design a binder that binds to a target protein + small molecule complex. The designed binder need to be highly specific for the prot + ligand complex, and shouldn't bind to the target protein only or the ligand only. Target protein can stabilize the binder + ligand interaction. 
-0) Binder backbone generation, scaffolding the target + ligand complex (i.e. generating the backbone on top of the target, on its C-term or N-term).
-1) 
-The begining is quite similar to the initial pipeline
+
+0) Binder backbone generation with RFdiffusion all_atoms, scaffolding the target + ligand complex (i.e. generating the backbone on top of the target, on its C-term or N-term).
+1) Generating a sequence for the binder with protein MPNN. The whole output from the previous step (target + ligand + binder backbone) is used, but only the binder sequence is redesigned.
+2) The generated binders are repredicted with AF2 from their sequence, and their structure is re-aligned to their initialy diffused backbone, in order to see if a sequence exists for the diffused backbone, and if this binder can fold. Binders are filtered based on their plDDT and their RMSD to the initial predicted backbone.
+3) Ligand-pocket redesign with ligand MPNN. 
 
 
+
+The begining is quite similar to the initial pipeline.
 steps 0 to 2 are done with the python script run.py, slightly adapted from the ipynb file (do not run as it is, proceed step by step
 the main differences with the original pipeline is the ability to run it in my local env, and for the purpose of designing a binder to a target + small molecule (e.g. trimming of some of the diffusion and pMPNN reference files to filter the binders)
 
