@@ -1,4 +1,4 @@
-# De novo Chemically induced dimer design pipeline using RFdiffusionAA, pMPNN & co
+# De novo *Chemically Induced Dimer* design pipeline using RFdiffusionAA, pMPNN & co
 
 *Designing binders for protein+ ligand complexes*
 
