@@ -405,7 +405,7 @@ done["trim_pdb"]=True
 if not done["trim_pdb"]:
   ## need to trim the reference pdb files to compare binder wth binder, without the target + ligand:
   # remove up to aa 410 + ligand at the end (= extract chain A only)
-  trim_cmd=f"{PYTHON['general']} {SCRIPT_DIR}/scripts/utils/trim_ref_pdb.py {DIFFUSION_DIR}/filtered_structures {DIFFUSION_DIR}/filtered_structures/bindersonly "
+  trim_cmd=f"{PYTHON['general']} {SCRIPT_DIR}/scripts/utils/trim_ref_pdb.py {DIFFUSION_DIR}/ {DIFFUSION_DIR}/filtered_structures/bindersonly "
   submit_script = "submit_ref_extraction.sh"
   utils.create_slurm_submit_script(filename=submit_script, name="binder_extraction",
                                       mem="16g", N_cores=8, partition="h100", time="0:05:00", email=EMAIL,
