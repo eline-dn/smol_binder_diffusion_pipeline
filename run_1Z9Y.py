@@ -10,9 +10,6 @@ import importlib
 from shutil import copy2
 import Bio.PDB
 
-#%load_ext autoreload (google colab stuff)
-#%autoreload 2
-
 ### Path to this cloned GitHub repo:
 SCRIPT_DIR = "/work/lpdi/users/eline/smol_binder_diffusion_pipeline"  # edit this to the GitHub repo path. Throws an error by default.
 assert os.path.exists(SCRIPT_DIR)
@@ -58,134 +55,48 @@ USE_GPU_for_AF2 = True
 
 
 # Ligand information
-params = [f"{SCRIPT_DIR}/theozyme/HBA/HBA.params"]  # Rosetta params file(s)
+params = [f"{SCRIPT_DIR}/theozyme/HBA/HBA.params"]  # Rosetta params file(s) !!!!!!!!!!!!!!!!!!!! to do: check if this is used in analyze af2 and remove if not. if yes, modify it according to the ligand!
 LIGAND = "FUN"
 
+
+DIFFUSION_DIR = f"{WDIR}/0_diffusion"
 MPNN_DIR = f"{WDIR}/1_proteinmpnn"
 AF2_DIR = f"{WDIR}/2_af2"
 
-# which steps are done?
-done = {
-    "0diffusion_setup": False,
-    "0diffusion": True,
-}
+
+# to add: parse script parameters with add parser to know wich steps need to be done
+
+
 #--------------------------------------------------------------------------------------------------------------------------------
 # ----------------------------------------0: diffusion run------------------------------------------------------------------------------------------------------
 
 ## setting up diffusion run: doesn't run diffusion, just to set up the directories
-if not done["0diffusion_setup"]:
     # diffusion_inputs = glob.glob(f"{SCRIPT_DIR}/input/*.pdb")
-    diffusion_inputs = list()
-    diffusion_inputs.append("1Z9Y_clean.pdb")
-    print(f"Found {len(diffusion_inputs)} PDB files")
+diffusion_inputs = list()
+diffusion_inputs.append("1Z9Y_clean.pdb")
+print(f"Found {len(diffusion_inputs)} PDB files")
 
-    ## Setting up general settings for diffusion
-    DIFFUSION_DIR = f"{WDIR}/0_diffusion"
-    if not os.path.exists(DIFFUSION_DIR):
-        os.makedirs(DIFFUSION_DIR, exist_ok=False)
+os.chdir(DIFFUSION_DIR)
 
-    os.chdir(DIFFUSION_DIR)
-    ## Setting up diffusion commands based on the input PDB file(s)
-    ## Diffusion jobs are run in separate directories for each input PDB
-    diffusion_rundirs = []
-    # inference.output_prefix='./out/{pdbname}_dif' in diffusion_dir
-    ## Creating a Slurm submit script
-    ## adjust time depending on number of designs and available hardware
 
-    ## If you're done with diffusion and happy with the outputs then mark it as done
-    DIFFUSION_DIR = f"{WDIR}/0_diffusion"
-    os.chdir(DIFFUSION_DIR)
 
-    if not os.path.exists(DIFFUSION_DIR + "/.done"):
-        with open(f"{DIFFUSION_DIR}/.done", "w") as file:
-            file.write(f"Run user: {username}\n")
+## diffusion run if not done
+if do["0_diffusion"]:
+    """ in the shell:sbatch nd[1-5]run_inference.slurm
+    write different commands, testing different parameters
+    
+    ## Analyzing locally
+    ### to do: find a way to parallelize this!!
+    p = subprocess.Popen(analysis_command, shell=True)
+    (output, err) = p.communicate()
+    
+    """
 
-    ## diffusion run if not done
-    if not done["0diffusion"]:
-        """ in the shell:sbatch nd[1-5]run_inference.slurm
 
-        mkdir /work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/out/unidealized
-        cp /work/lpdi/users/eline/rf_diffusion_all_atom/output/CID/unidealized/* /work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/out/unidealized
 
-        diff_output_dir="/work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/out" # contains all the backbones
-
-        """
-
-# ------------------------------------0.1 diffusion output analysis: ---------------------------------------------------------------------------------------------------------------------------
-done["0.1diffusion_analysis"] = True
-
-## set --analyze to True to avoid filtering the binders, only compute the scores (will allow us to evaluate the diff diffusion input parameters)
-
-analysis_script = f"{SCRIPT_DIR}/scripts/diffusion_analysis/process_diffusion_outputs.py"
-diffusion_rundirs = ["3DGQ_renumbered"]
-diffusion_outputs = []
-diffusion_trb = []
-for d in diffusion_rundirs:
-    diffusion_outputs += glob.glob(f"/work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/out/*.pdb")
-    # diffusion_trb += glob.glob(f"/work/lpdi/users/eline/smol_binder_diffusion_pipeline/3DGQout/0_diffusion/out/*.trb")
-
-if not done["0.1diffusion_analysis"]:
-    dif_analysis_cmd_dict = {
-        "--pdb": " ".join(diffusion_outputs),
-        # "--trb":" ".join(diffusion_trb),
-        # "--ref": f"{SCRIPT_DIR}/input/3DGQ_renumbered.pdb",
-        "--params": " ".join(params),
-        "--term_limit": "15.0",
-        "--SASA_limit": "0.3",
-        "--loop_limit": "0.4",
-        # "--ref_catres": "A15",
-        "--rethread": True,
-        "--fix": True,
-        "--exclude_clash_atoms": "O1",
-        "--ligand_exposed_atoms": None,
-        "--exposed_atom_SASA": "00.0",
-        "--longest_helix": "30",
-        "--rog": "30.0",
-        "--partial": None,
-        "--outdir": "filtered_structures1",
-        # "--traj": "0/30",
-        "--trb": None,
-        "--analyze": True,
-        "--nproc": "1",
-    }
-
-    analysis_command = f"{PYTHON['general']} {analysis_script}"
-    for k, val in dif_analysis_cmd_dict.items():
-        if val is not None:
-            if isinstance(val, list):
-                analysis_command += f" {k}"
-                analysis_command += " " + " ".join(val)
-            elif isinstance(val, bool):
-                if val is True:
-                    analysis_command += f" {k}"
-            else:
-                analysis_command += f" {k} {val}"
-
-    if len(diffusion_outputs) < 100:
-        ## Analyzing locally
-        p = subprocess.Popen(analysis_command, shell=True)
-        (output, err) = p.communicate()
-    else:
-        ## Too many structures to analyze.
-        ## Running the analysis as a SLURM job.
-        submit_script = "submit_diffusion_analysis.sh"
-        utils.create_slurm_submit_script(
-            filename=submit_script,
-            name="diffusion_analysis",
-            gpu=True,
-            mem="8g",
-            N_cores=dif_analysis_cmd_dict["--nproc"],
-            time="0:20:00",
-            email=EMAIL,
-            command=analysis_command,
-            outfile_name="output_analysis",
-            partition="h100",
-        )
-        p = subprocess.Popen(["sbatch", submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        (output, err) = p.communicate()
 
 # ----------------1: Running ProteinMPNN on diffused backbones ---------------------------------------------------
-#pdbs should be in /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/0_diffusion
+#pdbs should be in /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/0_diffusion, ie in DIFFUSION_DIR
 #pattern = re.compile(r"t2_\d+_(2|[2-8]\d|89)\.pdb$")
 pattern = re.compile(r"t2_\d+_(1|[3-9]|1[0-9]|9[0-9]|1[0-4][0-9])\.pdb$")
 all_pdbs = glob.glob(f"{DIFFUSION_DIR}/t2_*.pdb")
