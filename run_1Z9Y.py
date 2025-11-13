@@ -61,13 +61,15 @@ USE_GPU_for_AF2 = True
 params = [f"{SCRIPT_DIR}/theozyme/HBA/HBA.params"]  # Rosetta params file(s)
 LIGAND = "FUN"
 
+MPNN_DIR = f"{WDIR}/1_proteinmpnn"
+AF2_DIR = f"{WDIR}/2_af2"
 
 # which steps are done?
 done = {
     "0diffusion_setup": False,
     "0diffusion": True,
 }
-
+#--------------------------------------------------------------------------------------------------------------------------------
 # ----------------------------------------0: diffusion run------------------------------------------------------------------------------------------------------
 
 ## setting up diffusion run: doesn't run diffusion, just to set up the directories
@@ -467,4 +469,5 @@ os.chdir(f"{AF2_DIR}/good")
 
 
 #---------------------------------------------------
+
 #---------------------------------------------------
