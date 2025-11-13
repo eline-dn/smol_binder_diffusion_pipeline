@@ -273,74 +273,75 @@ done["2.1af2_trim"] = False
 
 if not done["2.1af2_trim"]:
     ## the pdbs need to be trimmed in order to keep only the "binder" part for the pMPNN sequence design (1) and alphafold binder reprediction (2)
-    fasta_files = glob.glob(f"{MPNN_DIR}/part2/seqs/*_T0.*.fa") ### output file
-    output_dir = f"{AF2_DIR}/trimmed_fastas_2"
-    os.makedirs(output_dir, exist_ok=True)
+fasta_files = glob.glob(f"{MPNN_DIR}/part2/seqs/*_T0.*.fa") ### output file
+output_dir = f"{AF2_DIR}/trimmed_fastas_2"
+os.makedirs(output_dir, exist_ok=True)
 
-    for ff in fasta_files:
-        with open(ff, "r") as f:
-            lines = f.readlines()
-        header = ""
-        sequence = ""
-        output_filename = os.path.join(output_dir, os.path.basename(ff))
-        with open(output_filename, "w") as outfile:
-            for line in lines:
-                if line.startswith(">"):
-                    if sequence:
-                        trimmed_sequence = sequence[:-256]
-                        outfile.write(header + trimmed_sequence + "\n")
-                    header = line.strip() + "\n"
-                    sequence = ""
-                else:
-                    sequence += line.strip()
-            if sequence:
-                trimmed_sequence = sequence[:-256]
-                outfile.write(header + trimmed_sequence + "\n")
-        print(f"Processed and trimmed: {ff} -> {output_filename}")
+for ff in fasta_files:
+    with open(ff, "r") as f:
+        lines = f.readlines()
+    header = ""
+    sequence = ""
+    output_filename = os.path.join(output_dir, os.path.basename(ff))
+    with open(output_filename, "w") as outfile:
+        for line in lines:
+            if line.startswith(">"):
+                if sequence:
+                    trimmed_sequence = sequence[:-256]
+                    outfile.write(header + trimmed_sequence + "\n")
+                header = line.strip() + "\n"
+                sequence = ""
+            else:
+                sequence += line.strip()
+        if sequence:
+            trimmed_sequence = sequence[:-256]
+            outfile.write(header + trimmed_sequence + "\n")
+    print(f"Processed and trimmed: {ff} -> {output_filename}")
 
     done["2.1af2_trim"] = True
 
 if (not done["2af2_binder_prediction"]) and done["2.1af2_trim"]:
   ### First collecting MPNN outputs and creating FASTA files for AF2 input
-  mpnn_fasta = utils.parse_fasta_files(glob.glob(f"{AF2_DIR}/trimmed_fastas_2/*.fa"))
-  mpnn_fasta = {k: seq.strip() for k, seq in mpnn_fasta.items() if "model_path" not in k}  # excluding the diffused poly-A sequence
-  # Giving sequences unique names based on input PDB name, temperature, and sequence identifier
-  mpnn_fasta = {k.split(",")[0]+"_"+k.split(",")[2].replace(" T=", "T")+"_0_"+k.split(",")[1].replace(" id=", ""): seq for k, seq in mpnn_fasta.items()}
-  print(f"A total of {len(mpnn_fasta)} sequences will be predicted.")
-  ## Splitting the MPNN sequences based on length
-  ## and grouping them in smaller batches for each AF2 job
-  ## Use group size of >40 when running on GPU. Also depends on how many sequences and resources you have.
-  SEQUENCES_PER_AF2_JOB = 100  # GPU
-  mpnn_fasta_split = utils.split_fasta_based_on_length(mpnn_fasta, SEQUENCES_PER_AF2_JOB, write_files=True)
-  ## Setting up AlphaFold2 run
-  AF2_recycles = 3
-  AF2_models = "4"  # add other models to this string if needed, i.e. "3 4 5"
-  commands_af2 = []
-  cmds_filename_af2 = "commands_af2"
-  with open(cmds_filename_af2, "w") as file:
-      for ff in glob.glob("*.fasta"):
-          commands_af2.append(f"{PYTHON['af2']} {AF2_script} "
-                              f"--af-nrecycles {AF2_recycles} --af-models {AF2_models} "
-                              f"--fasta {ff} --scorefile {ff.replace('.fasta', '.csv')}\n")
-          file.write(commands_af2[-1])
-  print("Example AF2 command:")
-  print(commands_af2[-1])
-  print("Number of AF2 commands:")
-  print(len(commands_af2))
+mpnn_fasta = utils.parse_fasta_files(glob.glob(f"{AF2_DIR}/trimmed_fastas_2/*.fa"))
+mpnn_fasta = {k: seq.strip() for k, seq in mpnn_fasta.items() if "model_path" not in k}  # excluding the diffused poly-A sequence
+# Giving sequences unique names based on input PDB name, temperature, and sequence identifier
+mpnn_fasta = {k.split(",")[0]+"_"+k.split(",")[2].replace(" T=", "T")+"_0_"+k.split(",")[1].replace(" id=", ""): seq for k, seq in mpnn_fasta.items()}
+print(f"A total of {len(mpnn_fasta)} sequences will be predicted.")
+## Splitting the MPNN sequences based on length
+## and grouping them in smaller batches for each AF2 job
+## Use group size of >40 when running on GPU. Also depends on how many sequences and resources you have.
+SEQUENCES_PER_AF2_JOB = 100  # GPU
+mpnn_fasta_split = utils.split_fasta_based_on_length(mpnn_fasta, SEQUENCES_PER_AF2_JOB, write_files=True)
+## Setting up AlphaFold2 run
+AF2_recycles = 3
+AF2_models = "4"  # add other models to this string if needed, i.e. "3 4 5"
+commands_af2 = []
+cmds_filename_af2 = "commands_af2"
+with open(cmds_filename_af2, "w") as file:
+    for ff in glob.glob("*.fasta"):
+        commands_af2.append(f"{PYTHON['af2']} {AF2_script} "
+                          f"--af-nrecycles {AF2_recycles} --af-models {AF2_models} "
+                          f"--fasta {ff} --scorefile {ff.replace('.fasta', '.csv')}\n")
+        file.write(commands_af2[-1])
+
+print("Example AF2 command:")
+print(commands_af2[-1])
+print("Number of AF2 commands:")
+print(len(commands_af2))
 
   ### Running AF2 with Slurm.
   ### Running jobs on the GPU. It takes ~10 minutes per sequence
   ###
 
-  submit_script = "submit_af2.sh"
-  #if USE_GPU_for_AF2 is True:
-  utils.create_slurm_submit_script(filename=submit_script, name="2_af2", mem="6g",
+submit_script = "submit_af2.sh"
+#if USE_GPU_for_AF2 is True:
+utils.create_slurm_submit_script(filename=submit_script, name="2_af2", mem="6g",
                                       N_cores=2, gpu=True, partition="h100", time="30:00:00", email=EMAIL, array=len(commands_af2),
-                                      array_commandfile=cmds_filename_af2, group=24) ## don't forget to adjust group!
+                                      array_commandfile=cmds_filename_af2, group=25) ## don't forget to adjust group!
   # /!\ need to add:
   """
-  module load gcc/13.2.0
-  module load cuda/12.4.1
+module load gcc/13.2.0
+module load cuda/12.4.1
   """
   # to the submit script before the commands
   #if True: #not os.path.exists(AF2_DIR+"/.done"):
@@ -405,7 +406,7 @@ done["trim_pdb"]=True
 if not done["trim_pdb"]:
   ## need to trim the reference pdb files to compare binder wth binder, without the target + ligand:
   # remove up to aa 410 + ligand at the end (= extract chain A only)
-  trim_cmd=f"{PYTHON['general']} {SCRIPT_DIR}/scripts/utils/trim_ref_pdb.py {DIFFUSION_DIR}/ {DIFFUSION_DIR}/filtered_structures/bindersonly "
+  trim_cmd=f"{PYTHON['general']} {SCRIPT_DIR}/scripts/utils/trim_ref_pdb_nterm.py {DIFFUSION_DIR}/ {DIFFUSION_DIR}/filtered_structures/bindersonly "
   submit_script = "submit_ref_extraction.sh"
   utils.create_slurm_submit_script(filename=submit_script, name="binder_extraction",
                                       mem="16g", N_cores=8, partition="h100", time="0:05:00", email=EMAIL,
