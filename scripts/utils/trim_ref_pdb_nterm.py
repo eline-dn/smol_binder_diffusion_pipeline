@@ -42,7 +42,7 @@ def _copy_structure_with_only_chain(structure, chain_id):
     return sb.get_structure()
     
 
-def trim_pdb_on_Cterm(input_pdb_path, output_pdb_path, trim_length=255):
+def trim_pdb_on_Cterm(input_pdb_path, output_pdb_path, trim_length=256):
     """
     Trims the last N amino acids from a PDB file.
 
