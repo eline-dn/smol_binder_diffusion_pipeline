@@ -420,7 +420,7 @@ if not done["trim_pdb"]:
 ### Catalytic residue sidechain RMSDs are calculated in the reference PDB has REMARK 666 line present
 
 analysis_cmd = f"{PYTHON['general']} {SCRIPT_DIR}/scripts/utils/analyze_af2.py --scorefile scores.csv "\
-               f"--ref_path {DIFFUSION_DIR}/filtered_structures/bindersonly/ --mpnn --lddt 0.85 --params {' '.join(params)}"
+               f"--ref_path {DIFFUSION_DIR}/bindersonly/ --mpnn --lddt 0.80 --params {' '.join(params)}"
 
 
 
@@ -458,7 +458,7 @@ if len(scores_af2_filtered) > 0:
     os.makedirs("good", exist_ok=True)
     good_af2_models = [row["Output_PDB"]+".pdb" for idx,row in scores_af2_filtered.iterrows()]
     for pdb in good_af2_models:
-        copy2(pdb, f"good/{pdb}")
+        copy2(f"part1/{pdb}", f"good/{pdb}")
     good_af2_models = glob.glob(f"{AF2_DIR}/good/*.pdb")
 else:
     sys.exit("No good models to continue this pipeline with")
