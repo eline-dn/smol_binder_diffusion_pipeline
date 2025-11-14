@@ -36,13 +36,13 @@ import design_utils
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--pdb", required=True, type=str, help="Input PDB")
-parser.add_argument("--params", nargs="+", type=str, help="Params files")
-parser.add_argument("--cstfile", type=str, help="Enzdes constraint file")
-parser.add_argument("--scoring", type=str, required=True, help="Path to a script that implement scoring methods for a particular design job.\n"
+#parser.add_argument("--params", nargs="+", type=str, help="Params files")
+#parser.add_argument("--cstfile", type=str, help="Enzdes constraint file") #can also be None?
+parser.add_argument("--scoring", type=str, required=True, help="Path to a script that implement scoring methods for a particular design job.\n" # use for example scripts/design/scoring/FUN_scoring.py
                     "Script must implement methods score_design(pose, sfx, catres) and filter_scores(scores), and a dictionary `filters` with filtering criteria.")
 parser.add_argument("--nstruct", type=int, default=1, help="How many design iterations?")
 parser.add_argument("--debug", action="store_true", default=False, help="For debugging.. terminates only and allows poking things interactively")
-parser.add_argument("--align_atoms", nargs="+", type=str, help="Ligand atom names used for aligning the rotamers. Can also be proved with the scoring script.")
+#parser.add_argument("--align_atoms", nargs="+", type=str, help="Ligand atom names used for aligning the rotamers. Can also be proved with the scoring script.")
 parser.add_argument("--keep_native", nargs="+", type=str, help="Residue positions that should not be redesigned. Use 'trb' as argument value to indicate that fixed positions should be taken from the 'con_hal_idx0' list in the corresponding TRB file provided with --trb flag.")
 parser.add_argument("--trb", type=str, help="TRB file associated with the input scaffold. Required only when using --keep_native flag.")
 parser.add_argument("--design_full", action="store_true", default=False, help="All positions are set designable. Apart from catalytic residues and those provided with --keep_native")
@@ -51,7 +51,7 @@ parser.add_argument("--iterate", action="store_true", default=False, help="runs 
 args = parser.parse_args()
 
 INPUT_PDB = args.pdb
-params = args.params
+params = None #args.params
 scorefilename = "scorefile.txt"
 
 
@@ -67,7 +67,7 @@ assert hasattr(scoring, "filters")
 if args.keep_native is not None:
     assert args.trb is not None, "Must provide TRB file when using --keep_native argument"
 
-cstfile = args.cstfile
+cstfile = None #args.cstfile
 
 """
 Getting PyRosetta started
@@ -162,7 +162,7 @@ if args.keep_native is not None:
         keep_native = [i for i in keep_native if _trb["inpaint_seq"][i-1] == True and _trb["inpaint_str"][i-1] == True]
 
 
-# 2 - running lig_ MPNN
+# 2 - running lig_MPNN
 
 
 print("Setting up MPNN API")
@@ -197,7 +197,7 @@ for N in range(args.nstruct):
         pdbstr = pyrosetta.distributed.io.to_pdbstring(_pose2)
 
         print("Identifying pocket positions")
-        # Re-evaluating the set of fixed residues at each iteration -optional?
+        # Re-evaluating the set of fixed residues at each iteration 
         # First finding which residues are closed to the ligand, and will be considered designable
         pocket_positions = setup_fixed_positions_around_target.get_fixed_positions(pose=_pose2, target_resno=ligand_resno, cutoff_CA=8.0, cutoff_sc=6.0, return_as_list=True)
         not_pocket = []
@@ -205,9 +205,9 @@ for N in range(args.nstruct):
             not_pocket = [res.seqpos() for res in _pose2.residues if res.seqpos() not in pocket_positions and not res.is_ligand()]
         fixed_residues = []
         for rn in list(set(catalytic_resnos+not_pocket+keep_native)):
-            fixed_residues.append(_pose2.pdb_info().chain(rn)+str(_pose2.pdb_info().number(rn)))
+            fixed_residues.append(_pose2.pdb_info().chain(rn)+str(_pose2.pdb_info().number(rn))) # don't touch the residues that are catalytic, native (= from the target protein, and not pocket (see option full design: if false, the binder residues that are not the pocket will also be redesigned. if True, all binder residues are considered pocket and redesigned. )
 
-        # Setting up MPNN runner -to keep
+        # Setting up MPNN runner 
         inp = mpnnrunner.MPNN_Input()
         inp.pdb = pdbstr
         inp.fixed_residues = fixed_residues
@@ -229,11 +229,11 @@ for N in range(args.nstruct):
         poses_iter = {}
         for n, seq in enumerate(mpnn_out["generated_sequences"]):
             _pose_threaded = design_utils.thread_seq_to_pose(_pose2, seq)
-            _pose_threaded = fix_catalytic_residue_rotamers(_pose_threaded, input_pose, matched_residues) # might adapt for the residues in the target pocket
+            _pose_threaded = fix_catalytic_residue_rotamers(_pose_threaded, input_pose, matched_residues) # the catalytic residues, not our case here
             if cstfile is not None:
                 cst_mover.add_cst(_pose_threaded)
             poses_iter[n] = design_utils.repack(_pose_threaded, sfx)
-            scores_iter[n] = sfx(poses_iter[n]) # apply a score function, might be useful
+            scores_iter[n] = sfx(poses_iter[n]) # apply a score function
             print(f"  Initial sequence {n} total_score: {scores_iter[n]}")
 
         best_score_id = min(scores_iter, key=scores_iter.get)
@@ -259,7 +259,6 @@ for N in range(args.nstruct):
         print(f"Iter {N_iter} scores:\n{scores_df.iloc[0]}")
         N_iter += 1
 
-# keep the best one that passes the filters, f none, iterate and if nothing after a few iterations, otherwise, too bad
     ####
     ## Done iterating, dumping outputs, if any
     ####
