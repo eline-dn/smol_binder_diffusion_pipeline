@@ -25,6 +25,7 @@ Ours will be a bit different, in order to be able to design Chemically induced d
 The begining is quite similar to the initial pipeline.
 steps 0 to 2 are done with the python script run.py, slightly adapted from the ipynb file (do not run as it is, proceed step by step
 the main differences with the original pipeline is the ability to run it in my local env, and for the purpose of designing a binder to a target + small molecule (e.g. trimming of some of the diffusion and pMPNN reference files to filter the binders)
+Running these steps smoothly is currently WIP with 'run_phase1.py'.
 
 
 
