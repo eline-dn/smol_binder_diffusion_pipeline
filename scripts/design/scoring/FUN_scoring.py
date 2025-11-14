@@ -69,7 +69,7 @@ def score_design(pose, sfx, catres):
 
     # Using a custom function to find HBond partners of the groups that might be involved
     # we will look for these atoms: 
-    at_list=list("O4","O5","N2", "N1","O3")
+    at_list=list("N2","O3")
     for n in at_list:
         df_scores.at[0, f"{n}_hbond"] = scoring_utils.find_hbonds_to_residue_atom(pose, ligand_seqpos, n) # this function Counts how many Hbond contacts input atom has with the protein.
         # the target atoms have to be adapted to the ligand
@@ -77,12 +77,12 @@ def score_design(pose, sfx, catres):
 
     # Checking h_bonds: what atoms need to have hbonds with the structure: N2 and O3 are the ones sticking out of the initial pocket
     # maybe just counting them? and setting a threshold 
-    """
-    if any([df_scores.at[0, x] > 0.0 for x in ['O1_hbond', 'O3_hbond']]) and any([df_scores.at[0, x] > 0.0 for x in ['O2_hbond', 'O4_hbond']]):
-        df_scores.at[0, 'COO_hbond'] = 1.0
+    
+    if any([df_scores.at[0, x] > 0.0 for x in ['N2_hbond', 'O3_hbond']]):
+        df_scores.at[0, 'binder_hbond'] = 1.0
     else:
-        df_scores.at[0, 'COO_hbond'] = 0.0
-    """
+        df_scores.at[0, 'binder_hbond'] = 0.0
+    
 
     # Calculating ContactMolecularSurface
     cms = pyrosetta.rosetta.protocols.simple_filters.ContactMolecularSurfaceFilter()
@@ -132,10 +132,10 @@ def filter_scores(scores):
 
 filters = {"all_cst": [1.5, "<="],
            "L_SASA": [0.20, "<="],
-           "COO_hbond": [1.0, "="],
+           "binder_hbond": [1.0, "="],
            "cms_per_atom": [5.0, ">="],
            "corrected_ddg": [-50.0, "<="],
-           "nlr_totrms": [0.8, "<="],
-           "nlr_SR1_rms": [0.6, "<="]}
+           "nlr_totrms": [0.8, "<="]#,"nlr_SR1_rms": [0.6, "<="]
+          }
 
 #align_atoms = ["N1", "N2", "N3", "N4"]
