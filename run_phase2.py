@@ -68,19 +68,27 @@ os.makedirs(DESIGN_DIR_ligMPNN+"/logs", exist_ok=True)
 DESIGN_DIR_ligMPNN_1A= f"{WDIR}/3.1_design_pocket_ligandMPNN/1A"
 os.makedirs(DESIGN_DIR_ligMPNN_1A, exist_ok=True)
 os.chdir(DESIGN_DIR_ligMPNN_1A)
-
-
 ### Performing 10 design iterations on each input structure
 NSTRUCT = 10
 cstfile = None #f"{SCRIPT_DIR}/theozyme/HBA/HBA_CYS_UPO.cst" # /!\ need to edit this, provide one that is adapted to the ligand
-# can also be none and automatically designed with pyrosetta
+
+# re-build filtered design name to retrieve them from the pmpnn output dir
+good_pmpnn_bb=list()
+for design in good_af2_models:
+    sub=os.basename(design).split("_")
+    name="_".join(sub[0:2])+"_"+sub[5]+"_"+sub[3]+".pdb"
+    good_pmpnn_bb.append(name)
+
 
 commands_design = []
 cmds_filename_des = "commands_design"
 with open(cmds_filename_des, "w") as file:
-    for pdb in glob.glob(f"{AF2_DIR}/good/with_heme/*.pdb"):
+    for pdb in good_pmpnn_bb:
+        #extract trb:
+        sub=os.basename(pdb).split("_")
+        trb="_".join(sub[0:2])+".trb"
         commands_design.append(f"{PYTHON['general']} {SCRIPT_DIR}/scripts/design/heme_pocket_ligMPNN.py "
-                             f"--pdb {pdb} --nstruct {NSTRUCT} --keep_native trb --trb {path to trb files}" # to indicate some fixed positions
+                             f"--pdb {MPNN_DIR}/backbones/{pdb} --nstruct {NSTRUCT} --keep_native trb --trb {DIFFUSION_DIR}/{trb}" # to indicate some fixed positions
                              f"--scoring {SCRIPT_DIR}/scripts/design/scoring/FUN_scoring.py\n" # /!\ ligand specific
                              #f"--cstfile {cstfile} > logs/{os.path.basename(pdb).replace('.pdb', '.log')}\n")
         file.write(commands_design[-1])
@@ -88,24 +96,14 @@ with open(cmds_filename_des, "w") as file:
 """test
 /work/lpdi/users/eline/miniconda3/envs/diffusion/bin/python /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/design/ligMPNN_pocket_design.py --pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/t2_1_20_1_T0.2.pdb --nstruct 10 --keep_native trb --trb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/0_diffusion/t2_1_20.trb --scoring /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/design/scoring/FUN_scoring.py
 """
-"""
-look into these parameters:
-parser.add_argument("--keep_native", nargs="+", type=str, help="Residue positions that should not be redesigned. Use 'trb' as argument value to indicate that fixed positions should be taken from the 'con_hal_idx0' list in the corresponding TRB file provided with --trb flag.")
-parser.add_argument("--trb", type=str, help="TRB file associated with the input scaffold. Required only when using --keep_native flag.")
-parser.add_argument("--design_full", action="store_true", default=False, help="All positions are set designable. Apart from catalytic residues and those provided with --keep_native")
-"""
-
 print("Example design command:")
 print(commands_design[-1])
-
-
 ### Running design jobs with Slurm.
 submit_script = "submit_design.sh"
 utils.create_slurm_submit_script(filename=submit_script, name="3.1_design_pocket_ligMPNN", mem="4g", 
                                  N_cores=1, time="3:00:00", email=EMAIL, array=len(commands_design),
                                  array_commandfile=cmds_filename_des)
 
-if not os.path.exists(DESIGN_DIR_ligMPNN+"/.done"):
-    p = subprocess.Popen(['sbatch', submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    (output, err) = p.communicate()
+p = subprocess.Popen(['sbatch', submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+(output, err) = p.communicate()
 
