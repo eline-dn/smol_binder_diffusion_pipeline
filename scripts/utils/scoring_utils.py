@@ -179,7 +179,7 @@ def getSASA(pose, resno=None, SASA_atoms=None, ignore_sc=False):
         return surf_vol
 
 
-def find_hbonds_to_residue_atom(pose, lig_seqpos, target_atom):
+def find_hbonds_to_residue_atom(pose, lig_seqpos, target_atom): # the one actually used in the scoring script
     """
     Counts how many Hbond contacts input atom has with the protein.
     """
