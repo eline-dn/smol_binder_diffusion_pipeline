@@ -106,6 +106,7 @@ fastRelax_proper = setup_fastrelax(sfx, crude=False)
 
 
 # 1 -  Which residues should or shouldn't be redesigned?
+# needs to be adapted to our case (function that finds the pocket residues. only keep those from the binder, not from the target)
 ###############################################
 ### PARSING PDB AND FINDING POCKET RESIDUES ###
 ###############################################
