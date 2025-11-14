@@ -55,10 +55,6 @@ input structure selection (filter the "good" structures from the pMPNN output fi
 -> score the outputs
 
 """
-
-
-## --------------------------------------------3.1 binding site design with ligandMPNN ----------------------------------------------------------------------
-
 ### Setting up design directory and commands
 os.chdir(WDIR)
 DESIGN_DIR_ligMPNN = f"{WDIR}/3.1_design_pocket_ligandMPNN"
@@ -67,6 +63,12 @@ os.chdir(DESIGN_DIR_ligMPNN)
 
 AF2_DIR = f"{WDIR}/2_af2"
 os.makedirs(DESIGN_DIR_ligMPNN+"/logs", exist_ok=True)
+
+## --------------------------------------------3.1 -1.a binding site design with ligandMPNN , redesign the pMPNN outputs, pocket only----------------------------------------------------------------------
+DESIGN_DIR_ligMPNN_1A= f"{WDIR}/3.1_design_pocket_ligandMPNN/1A"
+os.makedirs(DESIGN_DIR_ligMPNN_1A, exist_ok=True)
+os.chdir(DESIGN_DIR_ligMPNN_1A)
+
 
 ### Performing 10 design iterations on each input structure
 NSTRUCT = 10
@@ -84,7 +86,7 @@ with open(cmds_filename_des, "w") as file:
         file.write(commands_design[-1])
 
 """test
-scripts/design/ligMPNN_pocket_design.py --pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/t2_1_20_1_T0.2.pdb --nstruct 10 --keep_native trb --trb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/0_diffusion/t2_1_20.trb --scoring {SCRIPT_DIR}/scripts/design/scoring/FUN_scoring.py
+/work/lpdi/users/eline/miniconda3/envs/diffusion/bin/python /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/design/ligMPNN_pocket_design.py --pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/t2_1_20_1_T0.2.pdb --nstruct 10 --keep_native trb --trb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/0_diffusion/t2_1_20.trb --scoring /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/design/scoring/FUN_scoring.py
 """
 """
 look into these parameters:
