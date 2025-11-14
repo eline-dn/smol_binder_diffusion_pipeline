@@ -68,7 +68,7 @@ os.chdir(DESIGN_DIR_ligMPNN)
 AF2_DIR = f"{WDIR}/2_af2"
 os.makedirs(DESIGN_DIR_ligMPNN+"/logs", exist_ok=True)
 
-### Performing 5 design iterations on each input structure
+### Performing 10 design iterations on each input structure
 NSTRUCT = 10
 cstfile = None #f"{SCRIPT_DIR}/theozyme/HBA/HBA_CYS_UPO.cst" # /!\ need to edit this, provide one that is adapted to the ligand
 # can also be none and automatically designed with pyrosetta
@@ -78,11 +78,14 @@ cmds_filename_des = "commands_design"
 with open(cmds_filename_des, "w") as file:
     for pdb in glob.glob(f"{AF2_DIR}/good/with_heme/*.pdb"):
         commands_design.append(f"{PYTHON['general']} {SCRIPT_DIR}/scripts/design/heme_pocket_ligMPNN.py "
-                             f"--pdb {pdb} --nstruct {NSTRUCT} "
-                             f"--scoring {SCRIPT_DIR}/scripts/design/scoring/heme_scoring.py " # /!\ probably also needed to change this
-                             f"--params {' '.join(params)} --cstfile {cstfile} > logs/{os.path.basename(pdb).replace('.pdb', '.log')}\n")
+                             f"--pdb {pdb} --nstruct {NSTRUCT} --keep_native trb --trb {path to trb files}" # to indicate some fixed positions
+                             f"--scoring {SCRIPT_DIR}/scripts/design/scoring/FUN_scoring.py\n" # /!\ ligand specific
+                             #f"--cstfile {cstfile} > logs/{os.path.basename(pdb).replace('.pdb', '.log')}\n")
         file.write(commands_design[-1])
 
+"""test
+scripts/design/ligMPNN_pocket_design.py --pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/t2_1_20_1_T0.2.pdb --nstruct 10 --keep_native trb --trb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/0_diffusion/t2_1_20.trb --scoring {SCRIPT_DIR}/scripts/design/scoring/FUN_scoring.py
+"""
 """
 look into these parameters:
 parser.add_argument("--keep_native", nargs="+", type=str, help="Residue positions that should not be redesigned. Use 'trb' as argument value to indicate that fixed positions should be taken from the 'con_hal_idx0' list in the corresponding TRB file provided with --trb flag.")
