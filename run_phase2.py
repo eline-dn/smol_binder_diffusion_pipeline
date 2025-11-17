@@ -91,7 +91,7 @@ with open(cmds_filename_des, "w") as file:
         trb="_".join(sub[0:2])+".trb"
         commands_design.append(f"{PYTHON['ligandMPNN']} {SCRIPT_DIR}/scripts/design/ligMPNN_pocket_design.py "
                              f"--pdb {MPNN_DIR}/backbones/{pdb} --nstruct {NSTRUCT} --keep_native trb --trb {DIFFUSION_DIR}/{trb}" # to indicate some fixed positions
-                             f"--scoring {SCRIPT_DIR}/scripts/design/scoring/FUN_scoring.py\n" )# /!\ ligand specific
+                             f"--scoring {SCRIPT_DIR}/scripts/design/scoring/FUN_scoring.py \n" )# /!\ ligand specific
                              #f"--cstfile {cstfile} > logs/{os.path.basename(pdb).replace('.pdb', '.log')}\n")
         file.write(commands_design[-1])
 
