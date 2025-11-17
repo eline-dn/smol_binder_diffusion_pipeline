@@ -418,7 +418,11 @@ for N in range(args.nstruct):
         fixed_residues = []
         for rn in list(set(catalytic_resnos+not_pocket+keep_native)):
             fixed_residues.append(_pose2.pdb_info().chain(rn)+str(_pose2.pdb_info().number(rn))) # don't touch the residues that are catalytic, native (= from the target protein, and not pocket (see option full design: if false, the binder residues that are not the pocket will also be redesigned. if True, all binder residues are considered pocket and redesigned. )
-
+        # save the fixed residues (just to check)
+        with open("fixed_residues.txt", "a") as f:
+            f.write(f"fixed residues for {output_name} are:\n")
+            f.write("".join(fixed_residues))
+            f.write("\n")
         # Setting up MPNN runner 
         inp = mpnnrunner.MPNN_Input()
         inp.pdb = pdbstr
