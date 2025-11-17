@@ -103,7 +103,7 @@ print(commands_design[-1])
 ### Running design jobs with Slurm.
 submit_script = "submit_design.sh"
 utils.create_slurm_submit_script(filename=submit_script, name="3.1_design_pocket_ligMPNN", mem="4g", 
-                                 N_cores=1, time="30:00:00", array=len(commands_design),
+                                 N_cores=1, time="30:00:00", array=5,
                                  array_commandfile=cmds_filename_des)
 
 p = subprocess.Popen(['sbatch', submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
