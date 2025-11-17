@@ -446,8 +446,8 @@ for N in range(args.nstruct):
     ## Done iterating, dumping outputs, if any
     ####
     if len(scoring.filter_scores(scores_df)) == 0:
-        print(f"Design iteration {N} finished unsuccessfully in {(time.time() - iter_start_time):.2f} seconds.")
-        continue
+        print(f"Design iteration {N} finished unsuccessfully in {(time.time() - iter_start_time):.2f} seconds. \n Saving anyway")
+        #continue
 
     print(f"Iter {N}, doing final proper relax and scoring")
     good_pose = _pose2.clone()
