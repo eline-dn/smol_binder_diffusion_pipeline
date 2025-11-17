@@ -69,7 +69,7 @@ def score_design(pose, sfx, catres):
 
     # Using a custom function to find HBond partners of the groups that might be involved
     # we will look for these atoms: 
-    at_list=list("N2","O3")
+    at_list=list(("N2","O3"))
     for n in at_list:
         df_scores.at[0, f"{n}_hbond"] = scoring_utils.find_hbonds_to_residue_atom(pose, ligand_seqpos, n) # this function Counts how many Hbond contacts input atom has with the protein.
         # the target atoms have to be adapted to the ligand
