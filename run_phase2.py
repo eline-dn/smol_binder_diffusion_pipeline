@@ -78,7 +78,7 @@ cstfile = None #f"{SCRIPT_DIR}/theozyme/HBA/HBA_CYS_UPO.cst" # /!\ need to edit 
 good_pmpnn_bb=list()
 for design in good_af2_models:
     sub=os.path.basename(design).split("_")
-    name="_".join(sub[0:2])+"_"+sub[5]+"_"+sub[3]+".pdb"
+    name="_".join(sub[0:3])+"_"+sub[5]+"_"+sub[3]+".pdb"
     good_pmpnn_bb.append(name)
 
 
