@@ -30,6 +30,186 @@ sys.path.append(f"{SCRIPT_PATH}/../utils")
 import no_ligand_repack
 import scoring_utils
 import design_utils
+# helper functions:
+
+
+def get_crude_fastrelax(fastrelax):
+    """
+    Modifies your fastrelax method to run a very crude relax script
+    MonomerRelax2019:
+        protocols.relax.RelaxScriptManager: coord_cst_weight 1.0
+        protocols.relax.RelaxScriptManager: scale:fa_rep 0.040
+        protocols.relax.RelaxScriptManager: repack
+        protocols.relax.RelaxScriptManager: scale:fa_rep 0.051
+        protocols.relax.RelaxScriptManager: min 0.01
+        protocols.relax.RelaxScriptManager: coord_cst_weight 0.5
+        protocols.relax.RelaxScriptManager: scale:fa_rep 0.265
+        protocols.relax.RelaxScriptManager: repack
+        protocols.relax.RelaxScriptManager: scale:fa_rep 0.280
+        protocols.relax.RelaxScriptManager: min 0.01
+        protocols.relax.RelaxScriptManager: coord_cst_weight 0.0
+        protocols.relax.RelaxScriptManager: scale:fa_rep 0.559
+        protocols.relax.RelaxScriptManager: repack
+        protocols.relax.RelaxScriptManager: scale:fa_rep 0.581
+        protocols.relax.RelaxScriptManager: min 0.01
+        protocols.relax.RelaxScriptManager: coord_cst_weight 0.0
+        protocols.relax.RelaxScriptManager: scale:fa_rep 1
+        protocols.relax.RelaxScriptManager: repack
+        protocols.relax.RelaxScriptManager: min 0.00001
+    """
+    _fr = fastrelax.clone()
+    script = ["coord_cst_weight 1.0",
+              "scale:fa_rep 0.1",
+              "repack",
+              "coord_cst_weight 0.5",
+              "scale:fa_rep 0.280",
+              "repack",
+              "min 0.01",
+              "coord_cst_weight 0.0",
+              "scale:fa_rep 1",
+              "repack",
+              "min 0.005",
+              "accept_to_best"]
+    filelines = pyrosetta.rosetta.std.vector_std_string()
+    [filelines.append(l.rstrip()) for l in script]
+    _fr.set_script_from_lines(filelines)
+    return _fr
+
+
+def setup_fastrelax(sfx, crude=False):
+    fastRelax = pyrosetta.rosetta.protocols.relax.FastRelax(sfx, 1)
+    if crude is True:
+        fastRelax = get_crude_fastrelax(fastRelax)
+    fastRelax.constrain_relax_to_start_coords(True)
+
+    tf = pyrosetta.rosetta.core.pack.task.TaskFactory()
+    tf.push_back(pyrosetta.rosetta.core.pack.task.operation.InitializeFromCommandline())
+    tf.push_back(pyrosetta.rosetta.core.pack.task.operation.IncludeCurrent())
+    tf.push_back(pyrosetta.rosetta.core.pack.task.operation.NoRepackDisulfides())
+    e = pyrosetta.rosetta.core.pack.task.operation.ExtraRotamersGeneric()
+    e.ex1(True)
+    e.ex1aro(True)
+    if crude is False:
+        e.ex2(True)
+        # e.ex1_sample_level(pyrosetta.rosetta.core.pack.task.ExtraRotSample(1))
+    tf.push_back(e)
+    tf.push_back(pyrosetta.rosetta.core.pack.task.operation.RestrictToRepacking())
+    fastRelax.set_task_factory(tf)
+    return fastRelax
+
+def find_nonclashing_rotamers(pose, rotamers, resno, align_atoms):
+    print(f"Finding non-clashing rotamers for residue {pose.residue(resno).name()}-{resno}")
+    no_clash = []
+
+    clashcheck_time = 0.0
+    replace_time = 0.0
+
+    # Pre-calcululating the heavyatoms list
+    heavyatoms  = [n for n in range(1, rotamers[0].natoms()+1) if not rotamers[0].atom_is_hydrogen(n)]
+    # Re-order heavyatoms based on distance from nbr_atom
+    ha_dists = {ha: (rotamers[0].xyz(ha) - rotamers[0].nbr_atom_xyz()).norm() for ha in heavyatoms}
+    heavyatoms = sorted(ha_dists, key=ha_dists.get, reverse=True)
+
+    for rotamer in rotamers:
+        _st = time.time()
+        pose2 = design_utils.replace_ligand_in_pose(pose, rotamer, resno, align_atoms, align_atoms)
+        replace_time += time.time()-_st
+        _st = time.time()
+        if check_bb_clash(pose2, resno, heavyatoms) is False:
+            no_clash.append(rotamer)
+        clashcheck_time += time.time() - _st
+    print(f"Spent {replace_time:.4f}s doing replacements and {clashcheck_time:.4f}s doing clashchecks.")
+    print(f"Found {len(no_clash)} non-clashing rotamers.")
+    return no_clash
+
+
+def check_bb_clash(pose, resno, heavyatoms=None):
+    """
+    Checks if any heavyatom in the defined residue clashes with any backbone
+    atom in the pose
+    check_bb_clash(pose, resno) -> bool
+    Arguments:
+        pose (obj, pose)
+        resno (int)
+    """
+    trgt = pose.residue(resno)
+
+    if heavyatoms is None:
+        target_heavyatoms = [n for n in range(1, trgt.natoms()+1) if not trgt.atom_is_hydrogen(n)]
+        # Re-order heavyatoms based on distance from nbr_atom
+        ha_dists = {ha: (trgt.xyz(ha) - trgt.nbr_atom_xyz()).norm() for ha in target_heavyatoms}
+        target_heavyatoms = sorted(ha_dists, key=ha_dists.get, reverse=True)
+    else:
+        target_heavyatoms = heavyatoms
+
+    # Iterating over each heavyatom in the target and checking if it clashes
+    # with any backbone atom of any of the neighboring residues
+    LIMIT_HA = 2.5
+    LIMIT_H = 1.5
+    clash = False
+
+    for res in pose.residues:
+        if res.seqpos() == resno:
+            continue
+        if res.is_ligand():
+            continue
+        if (res.xyz('CA') - trgt.nbr_atom_xyz()).norm() > 14.0:
+            continue
+        for ha in target_heavyatoms:
+            if (res.xyz("CA") - trgt.xyz(ha)).norm() > 5.0:
+                continue
+            for bb_no in res.all_bb_atoms():
+                dist = (trgt.xyz(ha) - res.xyz(bb_no)).norm()
+                LIMIT = LIMIT_HA
+                if res.atom_is_hydrogen(bb_no):
+                    LIMIT = LIMIT_H
+                if dist < LIMIT:
+                    clash = True
+                    break
+            if clash is True:
+                break
+        if clash is True:
+            break
+    return clash
+
+
+def check_sc_clash(pose, resno, exclude_residues):
+    trgt = pose.residue(resno)
+    trgt_heavyatoms = [n for n in range(1,trgt.natoms()+1) if trgt.atom_type(n).element() != "H"]
+    LIMIT = 2.0
+    clashes = []
+    for res in pose.residues:
+        if res.seqpos() in exclude_residues:
+            continue
+        if res.is_ligand():
+            continue
+        if (res.xyz("CA") - trgt.nbr_atom_xyz()).norm() > 14.0:
+            continue
+        for ha in trgt_heavyatoms:
+            if (trgt.xyz(ha) - res.xyz("CA")).norm() > 10.0:
+                continue
+            for atomno in range(1, res.natoms()+1):
+                if res.atom_type(atomno).element() == "H":
+                    continue
+                if (trgt.xyz(ha) - res.xyz(atomno)).norm() < LIMIT:
+                    clashes.append(res.seqpos())
+                    break
+            if res.seqpos() in clashes:
+                break
+    return clashes
+
+
+def fix_catalytic_residue_rotamers(pose, ref_pose, catalytic_residues):
+    _pose = pose.clone()
+    mutres = pyrosetta.rosetta.protocols.simple_moves.MutateResidue()
+    for resno in catalytic_residues:
+        if ref_pose.residue(resno).name() != _pose.residue(resno).name():
+            print(f"Fixing catalytic residue {_pose.residue(resno).name()}-{resno} with reference {ref_pose.residue(resno).name()}-{resno}")
+            mutres.set_target(resno)
+            mutres.set_res_name(ref_pose.residue(resno).name())
+            mutres.apply(_pose)
+    return _pose
+
 
 
 # 0.2: Parsing args:
@@ -73,7 +253,7 @@ cstfile = None #args.cstfile
 Getting PyRosetta started
 """
 extra_res_fa = ""
-if args.params is not None:
+if False: #args.params is not None:
     extra_res_fa = "-extra_res_fa"
     for p in args.params:
         extra_res_fa += f" {p}"
@@ -95,7 +275,7 @@ pyr.init(f"{extra_res_fa} -dalphaball {DAB} -beta_nov16 -run:preserve_header -mu
 
 sfx = pyr.get_fa_scorefxn()
 
-if cstfile is not None:
+if False: #cstfile is not None:
     sfx.set_weight(pyrosetta.rosetta.core.scoring.score_type_from_name("atom_pair_constraint"), 1.5)
     sfx.set_weight(pyrosetta.rosetta.core.scoring.score_type_from_name("angle_constraint"), 1.0)
     sfx.set_weight(pyrosetta.rosetta.core.scoring.score_type_from_name("dihedral_constraint"), 1.0)     
