@@ -52,7 +52,7 @@ def score_design(pose, sfx, catres):
 
     fix_scorefxn(sfx)
 
-    df_scores.at[0, 'corrected_ddg'] = calculate_ddg(pose, sfx, catres[0])
+    df_scores.at[0, 'corrected_ddg'] = calculate_ddg(pose, sfx) #, catres[0]) # removed bc we don't have a line REMARK 666 in the pdb file
 
     # Calculating relative ligand SASA
     # First figuring out what is the path to the ligand PDB file
