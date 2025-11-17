@@ -1,3 +1,35 @@
+"""structure:
+FOR N in 0..nstruct-1:                     # outer loop
+
+    clone input pose
+    N_iter = 0
+    filt_scores = empty
+
+    WHILE filt_scores empty AND N_iter < 5:   # inner loop
+        
+        determine pocket + fixed residues
+        run ligandMPNN → many sequences
+        FOR each generated sequence:
+            thread sequence
+            repack
+            score (Rosetta)
+        choose best scoring sequence
+        crude FastRelax
+        user scoring + filtering
+        N_iter += 1
+
+    IF no passing design → continue outer loop
+
+    # Found a passing design
+    full proper FastRelax
+    final scoring
+    save final PDB + scorefile
+"""
+
+
+
+
+
 # 0.1: Initialisation and setup:
 import sys, os, glob, shutil, subprocess
 import numpy as np
