@@ -425,7 +425,7 @@ for N in range(args.nstruct):
         # save the fixed residues (just to check)
         with open(f"{pdb_name}fixed_res.txt", "a") as f:
             f.write(f"fixed residues for {output_name} are:\n")
-            f.write("".join(fixed_residues))
+            f.write(",".join(fixed_residues))
             f.write("\n")
         # Setting up MPNN runner 
         inp = mpnnrunner.MPNN_Input()
