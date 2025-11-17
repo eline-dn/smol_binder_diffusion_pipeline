@@ -380,6 +380,10 @@ if args.keep_native is not None:
 print("Setting up MPNN API")
 mpnnrunner = MPNNRunner(model_type="ligand_mpnn", ligand_mpnn_use_side_chain_context=True)  # starting with default checkpoint
 
+with open(f"{pdb_name}fixed_res.txt", "w") as f:
+    f.write("")
+
+
 for N in range(args.nstruct):
     iter_start_time = time.time()
     output_name = f"{pdb_name}_mDE_{N}"
@@ -419,7 +423,7 @@ for N in range(args.nstruct):
         for rn in list(set(catalytic_resnos+not_pocket+keep_native)):
             fixed_residues.append(_pose2.pdb_info().chain(rn)+str(_pose2.pdb_info().number(rn))) # don't touch the residues that are catalytic, native (= from the target protein, and not pocket (see option full design: if false, the binder residues that are not the pocket will also be redesigned. if True, all binder residues are considered pocket and redesigned. )
         # save the fixed residues (just to check)
-        with open("fixed_residues.txt", "a") as f:
+        with open(f"{pdb_name}fixed_res.txt", "a") as f:
             f.write(f"fixed residues for {output_name} are:\n")
             f.write("".join(fixed_residues))
             f.write("\n")
