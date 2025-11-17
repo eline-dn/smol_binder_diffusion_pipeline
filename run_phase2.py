@@ -27,7 +27,9 @@ PYTHON = {
     # "af2":"/work/lpdi/users/mpacesa/Pipelines/miniforge3/envs/BindCraft_kuma/bin/python",
     "af2": f"{CONDAPATH}/envs/mlfold/bin/python",
     "proteinMPNN": f"{CONDAPATH}/envs/diffusion/bin/python",
-    "general": f"{CONDAPATH}/envs/diffusion/bin/python"}
+    "general": f"{CONDAPATH}/envs/diffusion/bin/python",
+    "ligandMPNN": f"{CONDAPATH}/envs/ligandmpnn_env/bin/python"
+    }
 PROJECT = "CID_1Z9Y"
 ### Path where the jobs will be run and outputs dumped
 WDIR = "/work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout"
@@ -87,7 +89,7 @@ with open(cmds_filename_des, "w") as file:
         #extract trb:
         sub=os.basename(pdb).split("_")
         trb="_".join(sub[0:2])+".trb"
-        commands_design.append(f"{PYTHON['general']} {SCRIPT_DIR}/scripts/design/heme_pocket_ligMPNN.py "
+        commands_design.append(f"{PYTHON['ligandMPNN']} {SCRIPT_DIR}/scripts/design/heme_pocket_ligMPNN.py "
                              f"--pdb {MPNN_DIR}/backbones/{pdb} --nstruct {NSTRUCT} --keep_native trb --trb {DIFFUSION_DIR}/{trb}" # to indicate some fixed positions
                              f"--scoring {SCRIPT_DIR}/scripts/design/scoring/FUN_scoring.py\n" # /!\ ligand specific
                              #f"--cstfile {cstfile} > logs/{os.path.basename(pdb).replace('.pdb', '.log')}\n")
