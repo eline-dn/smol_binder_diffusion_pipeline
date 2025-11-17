@@ -200,7 +200,7 @@ def main():
     else:
         print(f"{len(scores.loc[scores.lDDT > lddt_cutoff])} models with lDDT >= {lddt_cutoff} to analyze.")
 
-    if params is None:
+    if True: #params is None:
         pyr.init('-mute all -beta_nov16')
     else:
         pyr.init('-extra_res_fa {} -mute all'.format(" ".join(params)))
