@@ -77,7 +77,7 @@ cstfile = None #f"{SCRIPT_DIR}/theozyme/HBA/HBA_CYS_UPO.cst" # /!\ need to edit 
 # re-build filtered design name to retrieve them from the pmpnn output dir
 good_pmpnn_bb=list()
 for design in good_af2_models:
-    sub=os.basename(design).split("_")
+    sub=os.path.basename(design).split("_")
     name="_".join(sub[0:2])+"_"+sub[5]+"_"+sub[3]+".pdb"
     good_pmpnn_bb.append(name)
 
@@ -87,11 +87,11 @@ cmds_filename_des = "commands_design"
 with open(cmds_filename_des, "w") as file:
     for pdb in good_pmpnn_bb:
         #extract trb:
-        sub=os.basename(pdb).split("_")
+        sub=os.path.basename(pdb).split("_")
         trb="_".join(sub[0:2])+".trb"
-        commands_design.append(f"{PYTHON['ligandMPNN']} {SCRIPT_DIR}/scripts/design/heme_pocket_ligMPNN.py "
+        commands_design.append(f"{PYTHON['ligandMPNN']} {SCRIPT_DIR}/scripts/design/ligMPNN_pocket_design.py "
                              f"--pdb {MPNN_DIR}/backbones/{pdb} --nstruct {NSTRUCT} --keep_native trb --trb {DIFFUSION_DIR}/{trb}" # to indicate some fixed positions
-                             f"--scoring {SCRIPT_DIR}/scripts/design/scoring/FUN_scoring.py\n" # /!\ ligand specific
+                             f"--scoring {SCRIPT_DIR}/scripts/design/scoring/FUN_scoring.py\n" )# /!\ ligand specific
                              #f"--cstfile {cstfile} > logs/{os.path.basename(pdb).replace('.pdb', '.log')}\n")
         file.write(commands_design[-1])
 
@@ -103,7 +103,7 @@ print(commands_design[-1])
 ### Running design jobs with Slurm.
 submit_script = "submit_design.sh"
 utils.create_slurm_submit_script(filename=submit_script, name="3.1_design_pocket_ligMPNN", mem="4g", 
-                                 N_cores=1, time="3:00:00", email=EMAIL, array=len(commands_design),
+                                 N_cores=1, time="30:00:00", array=len(commands_design),
                                  array_commandfile=cmds_filename_des)
 
 p = subprocess.Popen(['sbatch', submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
