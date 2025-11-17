@@ -319,14 +319,14 @@ done["trim_pdb"]=True
 if not done["trim_pdb"]:
   ## need to trim the reference pdb files to compare binder wth binder, without the target + ligand:
   # remove up to aa 410 + ligand at the end (= extract chain A only)
-  trim_cmd=f"{PYTHON['general']} {SCRIPT_DIR}/scripts/utils/trim_ref_pdb_nterm.py {DIFFUSION_DIR}/ {DIFFUSION_DIR}/filtered_structures/bindersonly "
-  submit_script = "submit_ref_extraction.sh"
-  utils.create_slurm_submit_script(filename=submit_script, name="binder_extraction",
-                                      mem="16g", N_cores=8, partition="h100", time="0:05:00", email=EMAIL,
-                                      command=trim_cmd, outfile_name="output_extraction")
+trim_cmd=f"{PYTHON['general']} {SCRIPT_DIR}/scripts/utils/trim_ref_pdb_nterm.py {DIFFUSION_DIR}/ {DIFFUSION_DIR}/filtered_structures/bindersonly "
+submit_script = "submit_ref_extraction.sh"
+utils.create_slurm_submit_script(filename=submit_script, name="binder_extraction",
+                                  mem="16g", N_cores=8, partition="h100", time="0:05:00", email=EMAIL,
+                                  command=trim_cmd, outfile_name="output_extraction")
 
-  p = subprocess.Popen(["sbatch", submit_script])
-  (output, err) = p.communicate()
+p = subprocess.Popen(["sbatch", submit_script])
+(output, err) = p.communicate()
 
 
 ### Calculating the RMSDs of filtered AF2 predictions relative to the diffusion outputs
@@ -371,7 +371,7 @@ if len(scores_af2_filtered) > 0:
     os.makedirs("good", exist_ok=True)
     good_af2_models = [row["Output_PDB"]+".pdb" for idx,row in scores_af2_filtered.iterrows()]
     for pdb in good_af2_models:
-        copy2(f"part1/{pdb}", f"good/{pdb}")
+        copy2(f"{pdb}", f"good/{pdb}")
     good_af2_models = glob.glob(f"{AF2_DIR}/good/*.pdb")
 else:
     sys.exit("No good models to continue this pipeline with")
