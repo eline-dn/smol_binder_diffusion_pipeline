@@ -208,6 +208,87 @@ def find_ligand_resnos(pose):
     return tgt_residues
 
 
+def get_pocket_positions(pdbfile=None, pose=None, target_resno=None, cutoff_CA=None, cutoff_sc=None, return_as_list=False):
+    """
+    Figures out which positions around a target residue are considered as the pocket residues
+    modification of the next function in ordrer to return the pocket residues
+
+    Parameters
+    ----------
+    pdbfile : str, optional
+        Path to PDB file
+    pose : pyrosetta.rosetta.core.pose.Pose, optional
+        Rosetta pose
+    target_resno : int or list, optional
+        DESCRIPTION. The default is None.
+    cutoff_CA : float, optional
+        Cutoff for residue CA and any target heavyatom distance. If below cutoff then will be fixed.
+        default = 5.5
+    cutoff_sc : float, optional
+        Cutoff for any residue sc-atom and any target heavyatom distance. If below cutoff then will be fixed.
+        default = 4.5
+
+    Returns
+    -------
+    a list with the residue number of the residues considered as pocket residues
+    """
+    assert isinstance(pdbfile, (type(None), str))
+    assert isinstance(target_resno, (type(None), int, list))
+    assert not all([x is None for x in [pdbfile, pose]]), "Must provide either path to pdbfile, or a pose object as input"
+
+    if cutoff_CA is None:
+        cutoff_CA = 5.5
+
+    cuts = [cutoff_CA, cutoff_CA+2.5, cutoff_CA+4.5, cutoff_CA+6.5]
+
+    if isinstance(target_resno, int):
+        target_resno = [target_resno]
+
+    pdbname = "pose"
+    if pdbfile is not None:
+        pdbname = os.path.basename(pdbfile)
+    else:
+        if pose.pdb_info() is not None:
+            pdbname = os.path.basename(pose.pdb_info().name())
+
+    if pose is None:
+        pose = pyr.pose_from_file(pdbfile)
+
+    tgt_residues = []
+    if target_resno is None:
+        for r in pose.residues:
+            if r.is_ligand() is True and r.is_virtual_residue() is False:
+                tgt_residues.append(r.seqpos())
+    else:
+        for r in pose.residues:
+            if r.seqpos() in target_resno:
+                if not r.is_ligand():
+                    print(f"Warning! residue {r.name3()}-{r.seqpos()} is not a ligand! I hope this is intentional.")
+                tgt_residues.append(r.seqpos())
+
+    pocket_residues = []
+    for tgt_resno in tgt_residues:
+        heavyatoms = find_target_heavyatoms(pose, tgt_resno)
+
+        residues = get_packer_layers(pose, tgt_resno, cuts=cuts, target_atoms=heavyatoms, design_GP=True)
+
+        # Need to somehow pick pocket residues that have SC atoms close to the ligand.
+        # Exclude from design: residues[0] and those that have SC atoms very close.
+        close_ones = get_residues_with_close_sc(pose, tgt_resno, heavyatoms,
+                                                cutoff_sc=cutoff_sc, exclude_residues=[])
+        pocket_residues += residues[0] + close_ones
+
+    pocket_residues = list(set(pocket_residues))
+
+    design_residues = [res.seqpos() for res in pose.residues if res.seqpos() not in pocket_residues and not res.is_ligand()]
+
+    design_res = '+'.join([str(x) for x in design_residues])
+    pocket_res = '+'.join([str(x) for x in pocket_residues])
+    print(f"{pdbname.replace('.pdb', '')}: {len(design_residues)} Non-pocket positions:\n"
+          f"   {design_res} \n Pocket positions:\n   {pocket_res}")
+
+    return(pocket_residues)
+
 def get_fixed_positions(pdbfile=None, pose=None, target_resno=None, cutoff_CA=None, cutoff_sc=None, return_as_list=False):
     """
     Figures out which positions around a target residue should be fixed in MPNN design
