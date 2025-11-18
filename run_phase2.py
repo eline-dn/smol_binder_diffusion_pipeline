@@ -65,8 +65,8 @@ os.chdir(DESIGN_DIR_ligMPNN)
 
 AF2_DIR = f"{WDIR}/2_af2"
 os.makedirs(DESIGN_DIR_ligMPNN+"/logs", exist_ok=True)
-
-## --------------------------------------------3.1 -1.a binding site design with ligandMPNN , redesign the pMPNN outputs, pocket only----------------------------------------------------------------------
+#---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------3.1 -1.a binding site design with ligandMPNN , redesign the pMPNN outputs, (almost full design??)----------------------------------------------------------------------
 DESIGN_DIR_ligMPNN_1A= f"{WDIR}/3.1_design_pocket_ligandMPNN/1A"
 os.makedirs(DESIGN_DIR_ligMPNN_1A, exist_ok=True)
 os.chdir(DESIGN_DIR_ligMPNN_1A)
@@ -108,4 +108,102 @@ utils.create_slurm_submit_script(filename=submit_script, name="3.1_design_pocket
 
 p = subprocess.Popen(['sbatch', submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 (output, err) = p.communicate()
+
+
+## --------------------------------------------3.1 -1.B binding site design with ligandMPNN , redesign the pMPNN outputs, (full design??)----------------------------------------------------------------------
+DESIGN_DIR_ligMPNN_1B= f"{WDIR}/3.1_design_pocket_ligandMPNN/1B"
+os.makedirs(DESIGN_DIR_ligMPNN_1B, exist_ok=True)
+os.chdir(DESIGN_DIR_ligMPNN_1B)
+### Performing 10 design iterations on each input structure
+NSTRUCT = 10
+cstfile = None #f"{SCRIPT_DIR}/theozyme/HBA/HBA_CYS_UPO.cst" # /!\ need to edit this, provide one that is adapted to the ligand
+
+# re-build filtered design name to retrieve them from the pmpnn output dir
+good_pmpnn_bb=list()
+for design in good_af2_models:
+    sub=os.path.basename(design).split("_")
+    name="_".join(sub[0:3])+"_"+sub[5]+"_"+sub[3]+".pdb"
+    good_pmpnn_bb.append(name)
+
+
+commands_design = []
+cmds_filename_des = "commands_design"
+with open(cmds_filename_des, "w") as file:
+    for pdb in good_pmpnn_bb:
+        #extract trb:
+        sub=os.path.basename(pdb).split("_")
+        trb="_".join(sub[0:3])+".trb"
+        commands_design.append(f"{PYTHON['ligandMPNN']} {SCRIPT_DIR}/scripts/design/ligMPNN_pocket_design.py "
+                             f"--pdb {MPNN_DIR}/backbones/{pdb} --nstruct {NSTRUCT} --keep_native trb --trb {DIFFUSION_DIR}/{trb}" # to indicate some fixed positions
+                             f" --scoring {SCRIPT_DIR}/scripts/design/scoring/FUN_scoring.py --design_full \n" )# /!\ ligand specific
+                             #f"--cstfile {cstfile} > logs/{os.path.basename(pdb).replace('.pdb', '.log')}\n")
+        file.write(commands_design[-1])
+
+"""test
+"""
+print("Example design command:")
+print(commands_design[-1])
+### Running design jobs with Slurm.
+submit_script = "submit_design.sh"
+utils.create_slurm_submit_script(filename=submit_script, name="3.1_design_pocket_ligMPNN_1B", mem="4g", 
+                                 N_cores=1, time="30:00:00", array=2,
+                                 array_commandfile=cmds_filename_des)
+
+p = subprocess.Popen(['sbatch', submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+(output, err) = p.communicate()
+
+
+
+## --------------------------------------------3.1 -1.C binding site design with ligandMPNN , redesign the pMPNN outputs, (specify which residues not to redesign, in ordrer to redesign pocket only!)----------------------------------------------------------------------
+DESIGN_DIR_ligMPNN_1C= f"{WDIR}/3.1_design_pocket_ligandMPNN/1C"
+os.makedirs(DESIGN_DIR_ligMPNN_1C, exist_ok=True)
+os.chdir(DESIGN_DIR_ligMPNN_1C)
+### Performing 10 design iterations on each input structure
+NSTRUCT = 5
+cstfile = None #f"{SCRIPT_DIR}/theozyme/HBA/HBA_CYS_UPO.cst" # /!\ need to edit this, provide one that is adapted to the ligand
+
+# re-build filtered design name to retrieve them from the pmpnn output dir
+good_pmpnn_bb=list()
+for design in good_af2_models:
+    sub=os.path.basename(design).split("_")
+    name="_".join(sub[0:3])+"_"+sub[5]+"_"+sub[3]+".pdb"
+    good_pmpnn_bb.append(name)
+
+
+commands_design = []
+cmds_filename_des = "commands_design"
+with open(cmds_filename_des, "w") as file:
+    for pdb in good_pmpnn_bb:
+        #extract trb:
+        sub=os.path.basename(pdb).split("_")
+        trb="_".join(sub[0:3])+".trb"
+        from Bio.PDB import PDBParser
+        parser = PDBParser(QUIET=True)
+        structure = parser.get_structure("x", f"{MPNN_DIR}/backbones/{pdb}")
+        model = structure[0]             # first model
+        chain = model["A"]               # chain A
+        # count only standard residues
+        residues = [res for res in chain.get_residues() if res.id[0] == " "]
+        target_reslist=list(map(str,range(len(residues)-256+1,len(residues))))
+        #print(pdb +f": {target_reslist}")
+        keep_nat=" ".join(target_reslist)
+        commands_design.append(f"{PYTHON['ligandMPNN']} {SCRIPT_DIR}/scripts/design/ligMPNN_pocket_design.py "
+                             f"--pdb {MPNN_DIR}/backbones/{pdb} --nstruct {NSTRUCT} --keep_native {keep_nat} --trb {DIFFUSION_DIR}/{trb}" # to indicate some fixed positions
+                             f" --scoring {SCRIPT_DIR}/scripts/design/scoring/FUN_scoring.py \n" )# /!\ ligand specific
+                             #f"--cstfile {cstfile} > logs/{os.path.basename(pdb).replace('.pdb', '.log')}\n")
+        file.write(commands_design[-1])
+
+"""test
+"""
+print("Example design command:")
+print(commands_design[-1])
+### Running design jobs with Slurm.
+submit_script = "submit_design.sh"
+utils.create_slurm_submit_script(filename=submit_script, name="3.1_design_pocket_ligMPNN_1C", mem="4g", 
+                                 N_cores=1, time="30:00:00", array=2,
+                                 array_commandfile=cmds_filename_des)
+
+p = subprocess.Popen(['sbatch', submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+(output, err) = p.communicate()
+
 
