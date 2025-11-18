@@ -88,7 +88,7 @@ with open(cmds_filename_des, "w") as file:
     for pdb in good_pmpnn_bb:
         #extract trb:
         sub=os.path.basename(pdb).split("_")
-        trb="_".join(sub[0:2])+".trb"
+        trb="_".join(sub[0:3])+".trb"
         commands_design.append(f"{PYTHON['ligandMPNN']} {SCRIPT_DIR}/scripts/design/ligMPNN_pocket_design.py "
                              f"--pdb {MPNN_DIR}/backbones/{pdb} --nstruct {NSTRUCT} --keep_native trb --trb {DIFFUSION_DIR}/{trb}" # to indicate some fixed positions
                              f" --scoring {SCRIPT_DIR}/scripts/design/scoring/FUN_scoring.py \n" )# /!\ ligand specific
