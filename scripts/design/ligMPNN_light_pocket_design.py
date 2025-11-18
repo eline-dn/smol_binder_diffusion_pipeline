@@ -7,11 +7,6 @@ redesign 5 seq / binder
 apply scoring
 save pdb with new seq and scores
 """
-
-
-
-
-
 # 0.1: Initialisation and setup:
 import sys, os, glob, shutil, subprocess
 import numpy as np
@@ -316,47 +311,40 @@ inp.redesigned_residues=design_res
 inp.temperature = 0.2
 inp.omit_AA = "CM"
 inp.batch_size = 5
-inp.number_of_batches = 1
+inp.number_of_batches = 2
 print(f"Generating {inp.batch_size*inp.number_of_batches} initial guess sequences with ligandMPNN")
 mpnn_out = mpnnrunner.run(inp)
 
 
-        ##############################################################################
-        ### Finding which of the MPNN-packed structures has the best Rosetta score ###
-        ##############################################################################
-        scores_iter = {}
-        poses_iter = {}
-        for n, seq in enumerate(mpnn_out["generated_sequences"]):
-            _pose_threaded = design_utils.thread_seq_to_pose(_pose2, seq)
-            _pose_threaded = fix_catalytic_residue_rotamers(_pose_threaded, input_pose, matched_residues) # the catalytic residues, not our case here
-            if cstfile is not None:
-                cst_mover.add_cst(_pose_threaded)
-            poses_iter[n] = design_utils.repack(_pose_threaded, sfx)
-            scores_iter[n] = sfx(poses_iter[n]) # apply a score function
-            print(f"  Initial sequence {n} total_score: {scores_iter[n]}")
+##############################################################################
+### Finding which of the MPNN-packed structures has the best Rosetta score ###
+##############################################################################
 
-        best_score_id = min(scores_iter, key=scores_iter.get)
-        _pose = poses_iter[n].clone()
+for n, seq in enumerate(mpnn_out["generated_sequences"]):
+    _pose_threaded = design_utils.thread_seq_to_pose(_pose2, seq)
+    #_pose_threaded = fix_catalytic_residue_rotamers(_pose_threaded, input_pose, matched_residues) # the catalytic residues, not our case here
+    poses_iter[n] = design_utils.repack(_pose_threaded, sfx)
+    scores_iter[n] = sfx(poses_iter[n]) # apply a score function
+    print(f"  Initial sequence {n} total_score: {scores_iter[n]}")
 
-        if cstfile is not None:
-            cst_mover.add_cst(_pose)
-        # then: keep the best sequence, accept and score
+best_score_id = min(scores_iter, key=scores_iter.get)
+_pose = poses_iter[n].clone()
 
-        print(f"Relaxing initial guess sequence {best_score_id}")
+print(f"Relaxing initial guess sequence {best_score_id}")
 
-        _pose2 = _pose.clone()
-        fastRelax.apply(_pose2)
+_pose2 = _pose.clone()
+fastRelax.apply(_pose2)
 
-        print(f"Relaxed initial sequence: total_score = {_pose2.scores['total_score']}")
+print(f"Relaxed initial sequence: total_score = {_pose2.scores['total_score']}")
 
-        ## Applying user-defined custom scoring
-        scores_df = scoring.score_design(_pose2, pyrosetta.get_fa_scorefxn(), catalytic_resnos)
-        filt_scores = scoring.filter_scores(scores_df)
+## Applying user-defined custom scoring
+scores_df = scoring.score_design(_pose2, pyrosetta.get_fa_scorefxn(), catalytic_resnos)
+filt_scores = scoring.filter_scores(scores_df)
 
-        results = {N_iter: {"pose": _pose2.clone(), "scores": scores_df.copy()}}
+results = {N_iter: {"pose": _pose2.clone(), "scores": scores_df.copy()}}
 
-        print(f"Iter {N_iter} scores:\n{scores_df.iloc[0]}")
-        N_iter += 1
+print(f"Iter {N_iter} scores:\n{scores_df.iloc[0]}")
+N_iter += 1
 
     ####
     ## Done iterating, dumping outputs, if any
