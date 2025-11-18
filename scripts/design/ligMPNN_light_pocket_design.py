@@ -321,40 +321,29 @@ mpnn_out = mpnnrunner.run(inp)
 ##############################################################################
 
 for n, seq in enumerate(mpnn_out["generated_sequences"]):
+    # thraed pose:
     _pose_threaded = design_utils.thread_seq_to_pose(_pose2, seq)
     #_pose_threaded = fix_catalytic_residue_rotamers(_pose_threaded, input_pose, matched_residues) # the catalytic residues, not our case here
     poses_iter[n] = design_utils.repack(_pose_threaded, sfx)
+    # score:
     scores_iter[n] = sfx(poses_iter[n]) # apply a score function
     print(f"  Initial sequence {n} total_score: {scores_iter[n]}")
-
-best_score_id = min(scores_iter, key=scores_iter.get)
-_pose = poses_iter[n].clone()
-
-print(f"Relaxing initial guess sequence {best_score_id}")
-
-_pose2 = _pose.clone()
-fastRelax.apply(_pose2)
-
-print(f"Relaxed initial sequence: total_score = {_pose2.scores['total_score']}")
-
-## Applying user-defined custom scoring
-scores_df = scoring.score_design(_pose2, pyrosetta.get_fa_scorefxn(), catalytic_resnos)
-filt_scores = scoring.filter_scores(scores_df)
-
-results = {N_iter: {"pose": _pose2.clone(), "scores": scores_df.copy()}}
-
-print(f"Iter {N_iter} scores:\n{scores_df.iloc[0]}")
-N_iter += 1
-
+    _pose = poses_iter[n].clone()
+    print(f"Relaxing initial guess sequence {best_score_id}")
+    # fast relaxation:
+    #_pose2 = _pose.clone()
+    #fastRelax.apply(_pose2)
+    #print(f"Relaxed initial sequence: total_score = {_pose2.scores['total_score']}")
+    catalytic_resnos=list()
+    ## Applying user-defined custom scoring
+    #scores_df = scoring.score_design(_pose2, pyrosetta.get_fa_scorefxn(), catalytic_resnos)
+    #filt_scores = scoring.filter_scores(scores_df)
     ####
-    ## Done iterating, dumping outputs, if any
+    ## dumping outputs
     ####
-    if len(scoring.filter_scores(scores_df)) == 0:
-        print(f"Design iteration {N} finished unsuccessfully in {(time.time() - iter_start_time):.2f} seconds.")
-        continue
 
-    print(f"Iter {N}, doing final proper relax and scoring")
-    good_pose = _pose2.clone()
+    print(f"Doing final proper relax and scoring")
+    good_pose = _pose.clone()
 
     _rlx_st = time.time()
     fastRelax_proper.apply(good_pose)
@@ -363,11 +352,14 @@ N_iter += 1
     ## Applying user-defined custom scoring
     scores_df = scoring.score_design(good_pose, pyrosetta.get_fa_scorefxn(), catalytic_resnos)
     sfx(good_pose)
+    output_name=f"{pdb_name}_seq{n}"
     scores_df.at[0, "description"] = output_name
 
-    print(f"Design iteration {N} finished in {(time.time() - iter_start_time):.2f} seconds.")
+    print(f"Design iteration {n} finished in {(time.time() - iter_start_time):.2f} seconds.")
     
-    if len(scoring.filter_scores(scores_df)) != 0:
-        print("Design iteration {N} is successful, dumping PDB: {output_name}.pdb")
-        good_pose.dump_pdb(f"{output_name}.pdb")
-        scoring_utils.dump_scorefile(scores_df, scorefilename)
+
+    print(f"Design iteration {n}, PDB: {output_name}.pdb")
+    good_pose.dump_pdb(f"{output_name}.pdb")
+    scoring_utils.dump_scorefile(scores_df, scorefilename)
+
+print(f"Generated 10 sequences for binder {pdb_name}")
