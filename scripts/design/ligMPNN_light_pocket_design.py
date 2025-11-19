@@ -243,7 +243,7 @@ args = parser.parse_args()
 INPUT_PDB = args.pdb
 scorefilename = "scorefile.txt"
 
-
+N_iter=args.nstruct
 
 ## Loading the user-provided scoring module
 sys.path.append(os.path.dirname(args.scoring))
@@ -387,4 +387,4 @@ for N in range(0,N_iter):
     good_pose.dump_pdb(f"{output_name}.pdb")
     scoring_utils.dump_scorefile(scores_df, scorefilename)
 
-print(f"Generated 10 sequences for binder {pdb_name}")
+print(f"Generated {N_iter} sequences for binder {pdb_name}")
