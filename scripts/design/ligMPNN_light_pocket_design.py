@@ -304,7 +304,8 @@ for design_cutoff in design_cutoffs:
     ### Running MPNN ####
     #########################################################
     _pose2 = pose.clone()
-    pdbstr = pyrosetta.distributed.io.to_pdbstring(_pose2)
+    pdbstr = pyrosetta.distributed.io.to_pdbstring(_pose2) # TO DO remove pyRosetta completely in this step, use biopython insted. the fact that we don't have a param file here shouldn't be a problem since the raw atom coordinate are juste transfered through the pose, 
+    # but the relaxation and scoring are just wothless without this params file :(
     print("Identifying positions to redesign, i.e. in the pocket but not from the target")
     pocket_positions = setup_fixed_positions_around_target.get_pocket_positions(pose=_pose2, target_resno=ligand_resno, cutoff_CA=design_cutoff, cutoff_sc=6.0, return_as_list=True) 
     design_res=[]
@@ -382,7 +383,8 @@ for design_cutoff in design_cutoffs:
             good_pose = _pose.clone()
             
             _rlx_st = time.time()
-            fastRelax_proper.apply(good_pose)
+            # skip
+            #fastRelax_proper.apply(good_pose)
             print(f"Final relax finished after {(time.time()-_rlx_st):.2f} seconds.")
             
             ## Applying user-defined custom scoring
