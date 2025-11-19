@@ -298,7 +298,18 @@ pdbstr = pyrosetta.distributed.io.to_pdbstring(_pose2)
 print("Identifying positions to redesign, i.e. in the pocket but not from the target")
 pocket_positions = setup_fixed_positions_around_target.get_pocket_positions(pose=_pose2, target_resno=ligand_resno, cutoff_CA=args.redesign_d_cutoff, cutoff_sc=6.0, return_as_list=True) 
 design_res=[]
-design_list=[res.seqpos() for res in _pose2.residues if res.seqpos() in pocket_positions and not res.is_ligand() and not in target_positions]
+target_positions = {int(x) for x in args.target_positions}
+design_list = [
+    res.seqpos()
+    for res in _pose2.residues
+    if (
+        res.seqpos() in pocket_positions
+        and not res.is_ligand()
+        and res.seqpos() not in target_positions
+    )
+]
+
+#design_list=[res.seqpos() for res in _pose2.residues if res.seqpos() in pocket_positions and not res.is_ligand() and not in target_positions]
 for rn in list(set(design_list)):
             design_res.append(_pose2.pdb_info().chain(rn)+str(_pose2.pdb_info().number(rn))) 
 
