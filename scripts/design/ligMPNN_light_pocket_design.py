@@ -4,7 +4,8 @@ res to keep
 res to re design
 lig MPNN setup and load pdb
 redesign 5 seq / binder
-apply scoring
+keep the best after  fast scoring with PyRosetta
+apply scoring and relax
 save pdb with new seq and scores
 """
 
