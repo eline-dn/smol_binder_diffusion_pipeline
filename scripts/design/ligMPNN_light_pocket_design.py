@@ -10,7 +10,7 @@ save pdb with new seq and scores
 
 """
 test: 
-/work/lpdi/users/eline/miniconda3/envs/ligandmpnn_env/bin/python /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/design/ligMPNN_light_pocket_design.py --pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/t2_1_20_1_T0.2.pdb --scoring /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/design/scoring/FUN_scoring.py --redesign_d_cutoff 8.0 --target_positions 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208 209 210 211 212 213 214 215 216 217 218 219 220 221 222 223 224 225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240 241 242 243 244 245 246 247 248 249 250 251 252 253 254 255 256 257 258 259 260 261 262 263 264 265 266 267 268 269 270 271 272 273 274 275 276 277 278 279 280 281 282 283 284 285 286 287 288 289 290 291 292 293 294 295 296 297 298 299 300 301 302 303 304 305 306 307 308 309 310 311 312 313 314 315 316 317 318 319 320 321 322 323 324 325 326 327 328 329 330 331 332 333 334 335 336 337 338 339 340 341 342 343 344 345 346 347 348 349 350 351 352 353 354 355 356 357 358 359 360 361 362 363 364 365 366 367 368 369 370 371 372 373 374 375 376 377 378 379 380 381 382 383 384 385 386 387 388 389 390 391 392 393 394 395
+/work/lpdi/users/eline/miniconda3/envs/ligandmpnn_env/bin/python /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/design/ligMPNN_light_pocket_design.py --pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/t2_1_20_1_T0.2.pdb --scoring /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/design/scoring/FUN_scoring.py --redesign_d_cutoff 8.0 --target_positions 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208 209 210 211 212 213 214 215 216 217 218 219 220 221 222 223 224 225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240 241 242 243 244 245 246 247 248 249 250 251 252 253 254 255 256 257 258 259 260 261 262 263 264 265 266 267 268 269 270 271 272 273 274 275 276 277 278 279 280 281 282 283 284 285 286 287 288 289 290 291 292 293 294 295 296 297 298 299 300 301 302 303 304 305 306 307 308 309 310 311 312 313 314 315 316 317 318 319 320 321 322 323 324 325 326 327 328 329 330 331 332 333 334 335 336 337 338 339 340 341 342 343 344 345 346 347 348 349 350 351 352 353 354 355 356 357 358 359 360 361 362 363 364 365 366 367 368 369 370 371 372 373 374 375 376 377 378 379 380 381 382 383 384 385 386 387 388 389 390 391 392 393 394 395 --nstruct 5
 """
 # 0.1: Initialisation and setup:
 import sys, os, glob, shutil, subprocess
@@ -237,6 +237,7 @@ parser.add_argument("--scoring", type=str, required=True, help="Path to a script
 #parser.add_argument("--align_atoms", nargs="+", type=str, help="Ligand atom names used for aligning the rotamers. Can also be proved with the scoring script.")
 parser.add_argument("--target_positions", nargs="+", type=str, help="Residue positions that belong to the target and should not be redesigned.")
 parser.add_argument("--redesign_d_cutoff", required=True, type=float, help ="distance cutoff for determining the pocket residues")
+parser.add_argument("--nstruct", type=int, default=5, help="How many design iterations? (how many output structures per binder)")
 args = parser.parse_args()
 
 INPUT_PDB = args.pdb
@@ -317,37 +318,42 @@ for rn in list(set(design_list)):
 
 print("Setting up MPNN API")
 mpnnrunner = MPNNRunner(model_type="ligand_mpnn", ligand_mpnn_use_side_chain_context=True)  # starting with default checkpoint
-# Setting up MPNN runner 
-
-#--redesigned_residues Specifying which residues need to be designed. This example redesigns the first 10 residues while fixing everything else.
-#--batch_size 3 \
-#--number_of_batches 5
-inp = mpnnrunner.MPNN_Input()
-inp.pdb = pdbstr
-#inp.fixed_residues = fixed_residues
-inp.redesigned_residues=design_res
-inp.temperature = 0.2
-inp.omit_AA = "CM"
-inp.batch_size = 5
-inp.number_of_batches = 2
-print(f"Generating {inp.batch_size*inp.number_of_batches} initial guess sequences with ligandMPNN")
-mpnn_out = mpnnrunner.run(inp)
-
-
-##############################################################################
-### Finding which of the MPNN-packed structures has the best Rosetta score ###
-##############################################################################
-poses_iter={}
-scores_iter={}
-for n, seq in enumerate(mpnn_out["generated_sequences"]):
-    # thraed pose:
-    _pose_threaded = design_utils.thread_seq_to_pose(_pose2, seq)
-    #_pose_threaded = fix_catalytic_residue_rotamers(_pose_threaded, input_pose, matched_residues) # the catalytic residues, not our case here
-    poses_iter[n] = design_utils.repack(_pose_threaded, sfx)
-    # score:
-    scores_iter[n] = sfx(poses_iter[n]) # apply a score function
-    print(f"  Initial sequence {n} total_score: {scores_iter[n]}")
-    _pose = poses_iter[n].clone()
+for N in range(0,N_iter):
+    
+    # Setting up MPNN runner 
+    
+    #--redesigned_residues Specifying which residues need to be designed. This example redesigns the first 10 residues while fixing everything else.
+    #--batch_size 3 \
+    #--number_of_batches 5
+    inp = mpnnrunner.MPNN_Input()
+    inp.pdb = pdbstr
+    #inp.fixed_residues = fixed_residues
+    inp.redesigned_residues=design_res
+    inp.temperature = 0.3
+    inp.omit_AA = "CM"
+    inp.batch_size = 5
+    inp.number_of_batches = 1
+    print(f"Generating {inp.batch_size*inp.number_of_batches} initial guess sequences with ligandMPNN")
+    mpnn_out = mpnnrunner.run(inp)
+    
+    
+    ##############################################################################
+    ### Finding which of the MPNN-packed structures has the best Rosetta score ###
+    ##############################################################################
+    poses_iter={}
+    scores_iter={}
+    for n, seq in enumerate(mpnn_out["generated_sequences"]):
+        # thraed pose:
+        _pose_threaded = design_utils.thread_seq_to_pose(_pose2, seq)
+        #_pose_threaded = fix_catalytic_residue_rotamers(_pose_threaded, input_pose, matched_residues) # the catalytic residues, not our case here
+        poses_iter[n] = design_utils.repack(_pose_threaded, sfx)
+        # score:
+        scores_iter[n] = sfx(poses_iter[n]) # apply a score function
+        print(f"  Initial sequence {n} total_score: {scores_iter[n]}")
+    
+    best_score_id = min(scores_iter, key=scores_iter.get)
+    # keep the best one:
+    _pose = poses_iter[best_score_id].clone()
     #print(f"Relaxing initial guess sequence {best_score_id}")
     # fast relaxation:
     #_pose2 = _pose.clone()
@@ -357,24 +363,27 @@ for n, seq in enumerate(mpnn_out["generated_sequences"]):
     ## Applying user-defined custom scoring
     #scores_df = scoring.score_design(_pose2, pyrosetta.get_fa_scorefxn(), catalytic_resnos)
     #filt_scores = scoring.filter_scores(scores_df)
+    
+    #selecting the best sequence in terms of pyRosetta score:
+    
     ####
     ## dumping outputs
     ####
-
-    print(f"Doing final proper relax and scoring")
+    
+    print(f"Doing proper relax and scoring for the best pose: posenumber {best_score_id}")
     good_pose = _pose.clone()
-
+    
     _rlx_st = time.time()
     fastRelax_proper.apply(good_pose)
     print(f"Final relax finished after {(time.time()-_rlx_st):.2f} seconds.")
-
+    
     ## Applying user-defined custom scoring
     scores_df = scoring.score_design(good_pose, pyrosetta.get_fa_scorefxn(), catalytic_resnos)
     sfx(good_pose)
-    output_name=f"{pdb_name}_seq{n}"
+    output_name=f"{pdb_name}_seq{N}"
     scores_df.at[0, "description"] = output_name
-
-    print(f"Design iteration {n}, PDB: {output_name}.pdb")
+    
+    print(f"Design iteration {N}, PDB: {output_name}.pdb")
     good_pose.dump_pdb(f"{output_name}.pdb")
     scoring_utils.dump_scorefile(scores_df, scorefilename)
 
