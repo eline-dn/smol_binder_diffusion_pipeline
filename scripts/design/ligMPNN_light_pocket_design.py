@@ -309,6 +309,8 @@ design_list = [
     )
 ]
 
+pr_list="+".join(list(map(str,design_list)))
+print(f"Redesign residues, ie in the pocket but not from the target: {pr_list}")
 #design_list=[res.seqpos() for res in _pose2.residues if res.seqpos() in pocket_positions and not res.is_ligand() and not in target_positions]
 for rn in list(set(design_list)):
             design_res.append(_pose2.pdb_info().chain(rn)+str(_pose2.pdb_info().number(rn))) 
@@ -346,7 +348,7 @@ for n, seq in enumerate(mpnn_out["generated_sequences"]):
     scores_iter[n] = sfx(poses_iter[n]) # apply a score function
     print(f"  Initial sequence {n} total_score: {scores_iter[n]}")
     _pose = poses_iter[n].clone()
-    print(f"Relaxing initial guess sequence {best_score_id}")
+    #print(f"Relaxing initial guess sequence {best_score_id}")
     # fast relaxation:
     #_pose2 = _pose.clone()
     #fastRelax.apply(_pose2)
@@ -371,9 +373,6 @@ for n, seq in enumerate(mpnn_out["generated_sequences"]):
     sfx(good_pose)
     output_name=f"{pdb_name}_seq{n}"
     scores_df.at[0, "description"] = output_name
-
-    print(f"Design iteration {n} finished in {(time.time() - iter_start_time):.2f} seconds.")
-    
 
     print(f"Design iteration {n}, PDB: {output_name}.pdb")
     good_pose.dump_pdb(f"{output_name}.pdb")
