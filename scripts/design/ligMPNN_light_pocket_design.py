@@ -236,17 +236,19 @@ parser.add_argument("--pdb", required=True, type=str, help="Input PDB")
 parser.add_argument("--scoring", type=str, required=True, help="Path to a script that implement scoring methods for a particular design job.\n" # use for example scripts/design/scoring/FUN_scoring.py
                     "Script must implement methods score_design(pose, sfx, catres) and filter_scores(scores), and a dictionary `filters` with filtering criteria.")
 #parser.add_argument("--align_atoms", nargs="+", type=str, help="Ligand atom names used for aligning the rotamers. Can also be proved with the scoring script.")
-parser.add_argument("--target_positions", nargs="+", type=str, help="Residue positions that belong to the target and should not be redesigned.")
-parser.add_argument("--redesign_d_cutoff", required=True, type=float, help ="distance cutoff for determining the pocket residues")
+parser.add_argument("--target_positions", nargs="+", type=int, help="Residue positions that belong to the target and should not be redesigned.")
+parser.add_argument("--redesign_d_cutoff", nargs="+", required=True, type=float, help ="distance cutoff for determining the pocket residues")
 parser.add_argument("--nstruct", type=int, default=5, help="How many design iterations? (how many output structures per binder)")
-parser.add_argument("--temperature", type=int, default=0.2, help="temperature in lig MPNN")
+parser.add_argument("--temperature",nargs="+", type=float, default=0.2, help="temperature in lig MPNN")
 args = parser.parse_args()
 
 INPUT_PDB = args.pdb
 scorefilename = "scorefile.txt"
 
 N_iter=args.nstruct
-temperature=args.temperature
+temperatures=args.temperature
+design_cutoffs=args.redesign_d_cutoff 
+
 ## Loading the user-provided scoring module
 sys.path.append(os.path.dirname(args.scoring))
 scoring = __import__(os.path.basename(args.scoring.replace(".py", "")))
@@ -280,113 +282,118 @@ fastRelax = setup_fastrelax(sfx, crude=True)
 fastRelax_proper = setup_fastrelax(sfx, crude=False)
 
 
-# 1 -  Which residues should or shouldn't be redesigned?
-###############################################
-### PARSING PDB AND FINDING POCKET RESIDUES ###
-###############################################
-pdb_name = os.path.basename(INPUT_PDB).replace(".pdb", "")
-input_pose = pyrosetta.pose_from_file(INPUT_PDB)
-pose = input_pose.clone()
-ligand_resno = pose.size()
-assert pose.residue(ligand_resno).is_ligand()
-
-matched_residues = design_utils.get_matcher_residues(INPUT_PDB)
-
-
-#########################################################
-### Running MPNN ####
-#########################################################
-_pose2 = pose.clone()
-pdbstr = pyrosetta.distributed.io.to_pdbstring(_pose2)
-print("Identifying positions to redesign, i.e. in the pocket but not from the target")
-pocket_positions = setup_fixed_positions_around_target.get_pocket_positions(pose=_pose2, target_resno=ligand_resno, cutoff_CA=args.redesign_d_cutoff, cutoff_sc=6.0, return_as_list=True) 
-design_res=[]
-target_positions = {int(x) for x in args.target_positions}
-design_list = [
-    res.seqpos()
-    for res in _pose2.residues
-    if (
-        res.seqpos() in pocket_positions
-        and not res.is_ligand()
-        and res.seqpos() not in target_positions
-    )
-]
-
-pr_list="+".join(list(map(str,design_list)))
-print(f"Redesign residues, ie in the pocket but not from the target: {pr_list}")
-#design_list=[res.seqpos() for res in _pose2.residues if res.seqpos() in pocket_positions and not res.is_ligand() and not in target_positions]
-for rn in list(set(design_list)):
-            design_res.append(_pose2.pdb_info().chain(rn)+str(_pose2.pdb_info().number(rn))) 
-
 print("Setting up MPNN API")
 mpnnrunner = MPNNRunner(model_type="ligand_mpnn", ligand_mpnn_use_side_chain_context=True)  # starting with default checkpoint
-for N in range(0,N_iter):
-    
-    # Setting up MPNN runner 
-    
-    #--redesigned_residues Specifying which residues need to be designed. This example redesigns the first 10 residues while fixing everything else.
-    #--batch_size 3 \
-    #--number_of_batches 5
-    inp = mpnnrunner.MPNN_Input()
-    inp.pdb = pdbstr
-    #inp.fixed_residues = fixed_residues
-    inp.redesigned_residues=design_res
-    inp.temperature = temperature
-    inp.omit_AA = "CM"
-    inp.batch_size = 5
-    inp.number_of_batches = 1
-    print(f"Generating {inp.batch_size*inp.number_of_batches} initial guess sequences with ligandMPNN")
-    mpnn_out = mpnnrunner.run(inp)
-    
-    
-    ##############################################################################
-    ### Finding which of the MPNN-packed structures has the best Rosetta score ###
-    ##############################################################################
-    poses_iter={}
-    scores_iter={}
-    for n, seq in enumerate(mpnn_out["generated_sequences"]):
-        # thraed pose:
-        _pose_threaded = design_utils.thread_seq_to_pose(_pose2, seq)
-        #_pose_threaded = fix_catalytic_residue_rotamers(_pose_threaded, input_pose, matched_residues) # the catalytic residues, not our case here
-        poses_iter[n] = design_utils.repack(_pose_threaded, sfx)
-        # score:
-        scores_iter[n] = sfx(poses_iter[n]) # apply a score function
-        print(f"  Initial sequence {n} total_score: {scores_iter[n]}")
-    
-    best_score_id = min(scores_iter, key=scores_iter.get)
-    # keep the best one:
-    _pose = poses_iter[best_score_id].clone()
-    #print(f"Relaxing initial guess sequence {best_score_id}")
-    # fast relaxation:
-    #_pose2 = _pose.clone()
-    #fastRelax.apply(_pose2)
-    #print(f"Relaxed initial sequence: total_score = {_pose2.scores['total_score']}")
-    catalytic_resnos=list()
-    ## Applying user-defined custom scoring
-    #scores_df = scoring.score_design(_pose2, pyrosetta.get_fa_scorefxn(), catalytic_resnos)
-    #filt_scores = scoring.filter_scores(scores_df)
-    
-    #selecting the best sequence in terms of pyRosetta score:
-    
-    ####
-    ## dumping outputs
-    ####
-    
-    print(f"Doing proper relax and scoring for the best pose: posenumber {best_score_id}")
-    good_pose = _pose.clone()
-    
-    _rlx_st = time.time()
-    fastRelax_proper.apply(good_pose)
-    print(f"Final relax finished after {(time.time()-_rlx_st):.2f} seconds.")
-    
-    ## Applying user-defined custom scoring
-    scores_df = scoring.score_design(good_pose, pyrosetta.get_fa_scorefxn(), catalytic_resnos)
-    sfx(good_pose)
-    output_name=f"{pdb_name}_lTp{temperature}_dcut{args.redesign_d_cutoff}_seq{N}"
-    scores_df.at[0, "description"] = output_name
 
-    print(f"Design iteration {N}, PDB: {output_name}.pdb")
-    good_pose.dump_pdb(f"{output_name}.pdb")
-    scoring_utils.dump_scorefile(scores_df, scorefilename)
 
-print(f"Generated {N_iter} sequences for binder {pdb_name}")
+for design_cutoff in design_cutoffs:
+    # 1 -  Which residues should or shouldn't be redesigned?
+    ###############################################
+    ### PARSING PDB AND FINDING POCKET RESIDUES ###
+    ###############################################
+    pdb_name = os.path.basename(INPUT_PDB).replace(".pdb", "")
+    input_pose = pyrosetta.pose_from_file(INPUT_PDB)
+    pose = input_pose.clone()
+    ligand_resno = pose.size()
+    assert pose.residue(ligand_resno).is_ligand()
+    
+    matched_residues = design_utils.get_matcher_residues(INPUT_PDB)
+    
+    
+    #########################################################
+    ### Running MPNN ####
+    #########################################################
+    _pose2 = pose.clone()
+    pdbstr = pyrosetta.distributed.io.to_pdbstring(_pose2)
+    print("Identifying positions to redesign, i.e. in the pocket but not from the target")
+    pocket_positions = setup_fixed_positions_around_target.get_pocket_positions(pose=_pose2, target_resno=ligand_resno, cutoff_CA=design_cutoff, cutoff_sc=6.0, return_as_list=True) 
+    design_res=[]
+    target_positions = {int(x) for x in args.target_positions}
+    design_list = [
+        res.seqpos()
+        for res in _pose2.residues
+        if (
+            res.seqpos() in pocket_positions
+            and not res.is_ligand()
+            and res.seqpos() not in target_positions
+        )
+    ]
+    
+    pr_list="+".join(list(map(str,design_list)))
+    print(f"Redesign residues, ie in the pocket but not from the target: {pr_list}")
+    #design_list=[res.seqpos() for res in _pose2.residues if res.seqpos() in pocket_positions and not res.is_ligand() and not in target_positions]
+    for rn in list(set(design_list)):
+                design_res.append(_pose2.pdb_info().chain(rn)+str(_pose2.pdb_info().number(rn))) 
+
+    for temperature in temperatures:
+        for N in range(0,N_iter):
+            
+            # Setting up MPNN runner 
+            
+            #--redesigned_residues Specifying which residues need to be designed. This example redesigns the first 10 residues while fixing everything else.
+            #--batch_size 3 \
+            #--number_of_batches 5
+            inp = mpnnrunner.MPNN_Input()
+            inp.pdb = pdbstr
+            #inp.fixed_residues = fixed_residues
+            inp.redesigned_residues=design_res
+            inp.temperature = temperature
+            inp.omit_AA = "CM"
+            inp.batch_size = 5
+            inp.number_of_batches = 1
+            print(f"Generating {inp.batch_size*inp.number_of_batches} initial guess sequences with ligandMPNN")
+            mpnn_out = mpnnrunner.run(inp)
+            
+            
+            ##############################################################################
+            ### Finding which of the MPNN-packed structures has the best Rosetta score ###
+            ##############################################################################
+            poses_iter={}
+            scores_iter={}
+            for n, seq in enumerate(mpnn_out["generated_sequences"]):
+                # thraed pose:
+                _pose_threaded = design_utils.thread_seq_to_pose(_pose2, seq)
+                #_pose_threaded = fix_catalytic_residue_rotamers(_pose_threaded, input_pose, matched_residues) # the catalytic residues, not our case here
+                poses_iter[n] = design_utils.repack(_pose_threaded, sfx)
+                # score:
+                scores_iter[n] = sfx(poses_iter[n]) # apply a score function
+                print(f"  Initial sequence {n} total_score: {scores_iter[n]}")
+            
+            best_score_id = min(scores_iter, key=scores_iter.get)
+            # keep the best one:
+            _pose = poses_iter[best_score_id].clone()
+            #print(f"Relaxing initial guess sequence {best_score_id}")
+            # fast relaxation:
+            #_pose2 = _pose.clone()
+            #fastRelax.apply(_pose2)
+            #print(f"Relaxed initial sequence: total_score = {_pose2.scores['total_score']}")
+            catalytic_resnos=list()
+            ## Applying user-defined custom scoring
+            #scores_df = scoring.score_design(_pose2, pyrosetta.get_fa_scorefxn(), catalytic_resnos)
+            #filt_scores = scoring.filter_scores(scores_df)
+            
+            #selecting the best sequence in terms of pyRosetta score:
+            
+            ####
+            ## dumping outputs
+            ####
+            
+            print(f"Doing proper relax and scoring for the best pose: posenumber {best_score_id}")
+            good_pose = _pose.clone()
+            
+            _rlx_st = time.time()
+            fastRelax_proper.apply(good_pose)
+            print(f"Final relax finished after {(time.time()-_rlx_st):.2f} seconds.")
+            
+            ## Applying user-defined custom scoring
+            scores_df = scoring.score_design(good_pose, pyrosetta.get_fa_scorefxn(), catalytic_resnos)
+            sfx(good_pose)
+            output_name=f"{pdb_name}_lTp{temperature}_dcut{design_cutoff}_seq{N}"
+            scores_df.at[0, "description"] = output_name
+        
+            print(f"Design iteration {N}, PDB: {output_name}.pdb")
+            good_pose.dump_pdb(f"{output_name}.pdb")
+            scoring_utils.dump_scorefile(scores_df, scorefilename)
+            
+
+print(f"Generated {N_iter} sequences for binder {pdb_name} ")#with temperature {"and".join(temperatures)}, and at redesign cutoffs {"and".join(args.redesign_d_cutoff)} ")
