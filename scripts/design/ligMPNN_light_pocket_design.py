@@ -335,7 +335,8 @@ mpnn_out = mpnnrunner.run(inp)
 ##############################################################################
 ### Finding which of the MPNN-packed structures has the best Rosetta score ###
 ##############################################################################
-
+poses_iter={}
+scores_iter={}
 for n, seq in enumerate(mpnn_out["generated_sequences"]):
     # thraed pose:
     _pose_threaded = design_utils.thread_seq_to_pose(_pose2, seq)
