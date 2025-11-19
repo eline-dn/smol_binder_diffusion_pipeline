@@ -239,13 +239,14 @@ parser.add_argument("--scoring", type=str, required=True, help="Path to a script
 parser.add_argument("--target_positions", nargs="+", type=str, help="Residue positions that belong to the target and should not be redesigned.")
 parser.add_argument("--redesign_d_cutoff", required=True, type=float, help ="distance cutoff for determining the pocket residues")
 parser.add_argument("--nstruct", type=int, default=5, help="How many design iterations? (how many output structures per binder)")
+parser.add_argument("--temperature", type=int, default=0.2, help="temperature in lig MPNN")
 args = parser.parse_args()
 
 INPUT_PDB = args.pdb
 scorefilename = "scorefile.txt"
 
 N_iter=args.nstruct
-
+temperature=args.temperature
 ## Loading the user-provided scoring module
 sys.path.append(os.path.dirname(args.scoring))
 scoring = __import__(os.path.basename(args.scoring.replace(".py", "")))
@@ -330,7 +331,7 @@ for N in range(0,N_iter):
     inp.pdb = pdbstr
     #inp.fixed_residues = fixed_residues
     inp.redesigned_residues=design_res
-    inp.temperature = 0.3
+    inp.temperature = temperature
     inp.omit_AA = "CM"
     inp.batch_size = 5
     inp.number_of_batches = 1
@@ -381,9 +382,9 @@ for N in range(0,N_iter):
     ## Applying user-defined custom scoring
     scores_df = scoring.score_design(good_pose, pyrosetta.get_fa_scorefxn(), catalytic_resnos)
     sfx(good_pose)
-    output_name=f"{pdb_name}_seq{N}"
+    output_name=f"{pdb_name}_lTp{temperature}_dcut{args.redesign_d_cutoff}_seq{N}"
     scores_df.at[0, "description"] = output_name
-    
+
     print(f"Design iteration {N}, PDB: {output_name}.pdb")
     good_pose.dump_pdb(f"{output_name}.pdb")
     scoring_utils.dump_scorefile(scores_df, scorefilename)
