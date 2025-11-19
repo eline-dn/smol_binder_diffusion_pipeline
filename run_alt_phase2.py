@@ -24,9 +24,10 @@ sys.path.append(SCRIPT_DIR + "/scripts/utils")
 import utils
 
 
-# SETUP-----------------------------------------------------
+#----------------------------------------------------------------------------------------------------------
+"""-----------------------------------------------------SETUP-----------------------------------------------------"""
+#----------------------------------------------------------------------------------------------------------
 diffusion_script = "/work/lpdi/users/eline/rf_diffusion_all_atom/run_inference.py"  # edit this
-# inpaint_script = "PATH/TO/RFDesign/inpainting/inpaint.py"  # edit this if needed
 proteinMPNN_script = f"{SCRIPT_DIR}/lib/LigandMPNN/run.py"  # from submodule
 AF2_script = f"{SCRIPT_DIR}/scripts/af2/af2.py"  # from submodule
 CONDAPATH = "/work/lpdi/users/eline/miniconda3"  # edit this depending on where your Conda environments live
@@ -65,6 +66,7 @@ for design in good_af2_models:
 # -------------------------------------------------------------------------------------
 """ -------------------------------------------------------------------------------------repredict their structure with target as template with AF2-------------------------------------------------------------------------------------"""
 #-------------------------------------------------------------------------------------
+
 
 ### -------------------------------------------------------------------------------------Aligning the ligand back into the AF2 predictions.-------------------------------------------------------------------------------------
 ### This is done by aligning the AF2 model to diffusion output and copying over the ligand using PyRosetta.
