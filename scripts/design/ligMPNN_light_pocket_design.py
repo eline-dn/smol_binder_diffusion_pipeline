@@ -386,16 +386,17 @@ for design_cutoff in design_cutoffs:
             # skip
             #fastRelax_proper.apply(good_pose)
             print(f"Final relax finished after {(time.time()-_rlx_st):.2f} seconds.")
-            
+            """
             ## Applying user-defined custom scoring
             scores_df = scoring.score_design(good_pose, pyrosetta.get_fa_scorefxn(), catalytic_resnos)
             sfx(good_pose)
             output_name=f"{pdb_name}_lTp{temperature}_dcut{design_cutoff}_seq{N}"
             scores_df.at[0, "description"] = output_name
-        
+            """
+            output_name=f"{pdb_name}_lTp{temperature}_dcut{design_cutoff}_seq{N}"
             print(f"Design iteration {N}, PDB: {output_name}.pdb")
             good_pose.dump_pdb(f"{output_name}.pdb")
-            scoring_utils.dump_scorefile(scores_df, scorefilename)
+            #scoring_utils.dump_scorefile(scores_df, scorefilename)
             
 
 print(f"Generated {N_iter} sequences for binder {pdb_name} ")#with temperature {"and".join(temperatures)}, and at redesign cutoffs {"and".join(args.redesign_d_cutoff)} ")
