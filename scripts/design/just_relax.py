@@ -38,16 +38,16 @@ INPUT_PDB = args.pdb
 """STRIP LIGAND AND RELAX"""
 #
 
-def strip_ligands(pdb_str):
+def rm_ligands(pdb_str):
     return "\n".join(
         line for line in pdb_str.splitlines()
-        if (line.startswith("HETATM"))
+        if (line.startswith("ATOM"))
     ) + "\n"
 
 def str_ligands(pdb_str):
     return "\n".join(
         line for line in pdb_str.splitlines()
-        if (line.startswith("ATOM"))
+        if (line.startswith("HETATM"))
     ) + "\n"
 
 
@@ -193,7 +193,8 @@ def relax_me(pdb_in, pdb_out): # remove ligand, apply relaxation, put back ligan
   # also outputs the relaxed and realigned pdb str
   pdb_str = pdb_to_string(pdb_in)
   ligand_str = str_ligands(pdb_str)
-  pdb_str_clean = strip_ligands(pdb_str)
+  pdb_str_clean = rm_ligands(pdb_str)
+  print(pdb_str_clean)
   protein_obj = p_cf.from_pdb_string(pdb_str_clean)
   amber_relaxer = relax.AmberRelaxation(
     max_iterations=0,
