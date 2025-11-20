@@ -194,7 +194,7 @@ def relax_me(pdb_in, pdb_out): # remove ligand, apply relaxation, put back ligan
   pdb_str = pdb_to_string(pdb_in)
   ligand_str = str_ligands(pdb_str)
   pdb_str_clean = strip_ligands(pdb_str)
-  protein_obj = p_cf.from_pdb_string(pdb_str)
+  protein_obj = p_cf.from_pdb_string(pdb_str_clean)
   amber_relaxer = relax.AmberRelaxation(
     max_iterations=0,
     tolerance=2.39,
