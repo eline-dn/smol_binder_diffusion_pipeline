@@ -37,7 +37,8 @@ PYTHON = {
     "af2": f"{CONDAPATH}/envs/mlfold/bin/python",
     "proteinMPNN": f"{CONDAPATH}/envs/diffusion/bin/python",
     "general": f"{CONDAPATH}/envs/diffusion/bin/python",
-    "ligandMPNN": f"{CONDAPATH}/envs/ligandmpnn_env/bin/python"
+    "ligandMPNN": f"{CONDAPATH}/envs/ligandmpnn_env/bin/python",
+    "ligandMPNN_relax":f"{CONDAPATH}/envs/ligandmpnn_relax_env/bin/python"
     }
 PROJECT = "CID_1Z9Y"
 ### Path where the jobs will be run and outputs dumped
@@ -63,27 +64,6 @@ for design in good_af2_models:
     name="_".join(sub[0:3])+"_"+sub[5]+"_"+sub[3]+".pdb"
     good_pmpnn_bb.append(name)
   
-# -------------------------------------------------------------------------------------
-""" -------------------------------------------------------------------------------------repredict their structure with target as template with AF2-------------------------------------------------------------------------------------"""
-#-------------------------------------------------------------------------------------
-
-
-### -------------------------------------------------------------------------------------Aligning the ligand back into the AF2 predictions.-------------------------------------------------------------------------------------
-### This is done by aligning the AF2 model to diffusion output and copying over the ligand using PyRosetta.
-# TO DO: check params!!
-
-align_cmd = f"{PYTHON['general']} {SCRIPT_DIR}/scripts/utils/place_ligand_after_af2.py "\
-            f"--outdir with_heme2 --params {' '.join(params)} "\
-            f"--pdb {' '.join(good_af2_models)} "\
-            f"--ref {' '.join(glob.glob(DIFFUSION_DIR+'/filtered_structures/*.pdb'))}"
-
-p = subprocess.Popen(align_cmd, shell=True)
-(output, err) = p.communicate()
-
-
-#-------------------------------------------------------------------------------------
-"""---------------------------------------------------------------------relax the pdb-------------------------------------------------------------------------------------"""
-#-------------------------------------------------------------------------------------
 
 
 #--------------------------------------------------------------------------------------------------------------------------------------------
@@ -105,7 +85,7 @@ with open(cmds_filename_des, "w") as file:
         keep_nat=" ".join(target_reslist) # these belong to the target protein and should not be re-designed
         temperatures=" ".join(list(("0.2", "0.3")))
         distance_redesign_cutoffs = " ".join(list(("8.0", "15.0", "500.0")))
-        commands_design.append(f"{PYTHON['ligandMPNN']} {SCRIPT_DIR}/scripts/design/ligMPNN_light_pocket_design.py " ### change name of the scipt and the pdbs!!!!
+        commands_design.append(f"{PYTHON['ligandMPNN_relax']} {SCRIPT_DIR}/scripts/design/relax_n_redesign.py " ### change name of the scipt and the pdbs!!!!
                          f"--pdb {MPNN_DIR}/backbones/{pdb} --nstruct {NSTRUCT} --redesign_d_cutoff {distance_redesign_cutoffs} --target_positions {keep_nat}"
                          f" --scoring {SCRIPT_DIR}/scripts/design/scoring/FUN_scoring.py --temperature {temperatures} \n" )
         file.write(commands_design[-1])
