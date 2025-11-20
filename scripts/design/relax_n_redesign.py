@@ -93,6 +93,10 @@ def str_ligands(pdb_str):
         if (line.startswith("ATOM"))
     ) + "\n"
 
+
+SCRIPT_DIR = os.path.dirname(__file__)
+sys.path.append(f"{SCRIPT_DIR}/../../lib/alphafold")
+
 from alphafold.relax import relax
 from alphafold.relax import utils
 from alphafold.common import protein as p_cf
