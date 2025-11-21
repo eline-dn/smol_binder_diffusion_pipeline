@@ -352,7 +352,7 @@ def relax_me(pdb_in, pdb_out, ligand_str, bb_pdb_str): #  apply relaxation, alig
   print(pdb_str_clean)
   protein_obj = p_cf.from_pdb_string(pdb_str_clean)
   amber_relaxer = relax.AmberRelaxation(
-    max_iterations=0,
+    max_iterations=10000,
     tolerance=2.39,
     stiffness=10.0,
     exclude_residues=[],
