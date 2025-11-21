@@ -174,13 +174,14 @@ from Bio.PDB import PDBIO, Chain
 # change chain id for binder residues (from A to B):
 for model in structure:
     # Retrieve chain A (binder assumed to be first part)
-    chain_A = Chain.Chain("A")
+    model = structure[0]             # first model
+    chain_A = model["A"] 
     residues_A = list(chain_A.get_residues())
     print("res A:", residues_A)
     if binder_length > len(residues_A):
         raise ValueError("binder_length exceeds number of residues in chain A")
     # Create new chain B
-    chain_B = Chain.Chain("B")
+    chain_B = Bio.PDB.Chain.Chain("B")
     # Transfer the binder residues into chain B
     for i, residue in enumerate(residues_A):
         if i < binder_length:
