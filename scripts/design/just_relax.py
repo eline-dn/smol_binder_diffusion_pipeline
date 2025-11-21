@@ -52,7 +52,7 @@ def str_ligands(pdb_str):
         if (line.startswith("HETATM"))
     ) + "\n"
 
-def to_one_chain(pdb_str, chain_id="A"):
+def to_one_chain_nope(pdb_str, chain_id="A"): # doesn't work
     lines=list()
     for line in pdb_str.splitlines():
         if (line.startswith("ATOM")):
@@ -61,6 +61,18 @@ def to_one_chain(pdb_str, chain_id="A"):
                 line[21:22]=chain_id
         lines.append(line)
     return("\n".join(lines))   
+
+def to_one_chain(pdb_str, chain_id="A"):
+    new_lines = []
+    for line in pdb_str.splitlines():
+        if line.startswith("ATOM"):
+            # chain ID is in column 22 → index 21
+            if len(line) >= 22:
+                # rebuild the line with modified chain ID
+                line = line[:21] + chain_id + line[22:]
+        new_lines.append(line)
+    return "\n".join(new_lines)
+
     
        
 MODRES = {'MSE':'MET','MLY':'LYS','FME':'MET','HYP':'PRO',
@@ -205,7 +217,7 @@ def relax_me(pdb_in, pdb_out, ligand_str, bb_pdb_str): #  apply relaxation, alig
   pdb_str = pdb_to_string(pdb_in)
   #ligand_str = str_ligands(pdb_str)
   pdb_str_clean = to_one_chain(pdb_str, chain_id="A")
-  #print(pdb_str_clean)
+  print(pdb_str_clean)
   protein_obj = p_cf.from_pdb_string(pdb_str_clean)
   amber_relaxer = relax.AmberRelaxation(
     max_iterations=0,
