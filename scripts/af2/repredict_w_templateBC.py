@@ -52,7 +52,7 @@ def predict_binder_complex(prediction_model, binder_sequence, mpnn_design_name, 
             }
             prediction_stats[model_num+1] = stats
 
-    return prediction_stats, pass_af2_filters
+    return prediction_stats
 
 def rm_ligands(pdb_str):
     return "\n".join(
@@ -154,12 +154,12 @@ residues = [res for res in chain.get_residues() if is_aa(res, standard=True)]
 #print("residues:", residues)
 print("len residues:", len(residues))
 # extract/trim the binder sequence
-binder_length=len(residues)-256+1
+binder_length=len(residues)-256
 print("binder len:", binder_length)
 #binder_sequence="".join(residues[:binder_length+1])
 # convert residues to one-letter sequence
 res_letters = []
-for res in residues[:binder_length+1]:
+for res in residues[:binder_length]:
     try:
         aa = three_to_one[res.resname]
         res_letters.append(aa)
@@ -168,6 +168,7 @@ for res in residues[:binder_length+1]:
 
 binder_sequence = "".join(res_letters)
 print(binder_sequence)
+print("len binder seq:", len(binder_sequence))
 # change chain id for binder residues (from A to B):
 from Bio.PDB import PDBIO, Chain
 
@@ -181,7 +182,8 @@ for model in structure:
     if binder_length > len(residues_A):
         raise ValueError("binder_length exceeds number of residues in chain A")
     # Create new chain B
-    chain_B = Bio.PDB.Chain.Chain("B")
+    chain_B = Chain.Chain("B")
+    count=0
     # Transfer the binder residues into chain B
     for i, residue in enumerate(residues_A):
         if i < binder_length:
@@ -189,8 +191,10 @@ for model in structure:
             chain_A.detach_child(residue.id)
             # Add to chain B
             chain_B.add(residue)
+            count+=1
     # Add new chain B to the model
     model.add(chain_B)
+    print("len chain B:",count)
 
 # Save modified structure
 path=complex_pdb_clean.replace('.pdb','')
@@ -214,8 +218,12 @@ complex_prediction_model.prep_inputs(pdb_filename=complex_pdb_clean_split,
                                          use_binder_template=True,
                                          rm_target_seq=False, #remove target template sequence for reprediction (increases target flexibility)
                                         rm_template_ic=True)
-mpnn_complex_statistics, pass_af2_filters = predict_binder_complex(prediction_model=complex_prediction_model,
+
+
+mpnn_complex_statistics = predict_binder_complex(prediction_model=complex_prediction_model,
                                                                     binder_sequence=binder_sequence, 
                                                                     mpnn_design_name=design_name,
                                                                    prediction_models=[1],
                                                                     design_path= design_paths)
+
+print(f"Predicted complex structure for template {complex_pdb} \n Saved in {design_paths}")
