@@ -10,11 +10,13 @@ from colabdesign.af.alphafold.common import residue_constants
 from colabdesign.af.loss import get_ptm, mask_loss, get_dgram_bins, _get_con_loss, get_plddt_loss, get_exp_res_loss, get_pae_loss, get_con_loss, get_rmsd_loss, get_dgram_loss, get_fape_loss
 from colabdesign.shared.utils import copy_dict
 from colabdesign.shared.prep import prep_pos
-
+"""test
+python /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/af2/repredict_w_templateBC.py --complex_pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/t2_1_20_1_T0.2.pdb --scorefile score.txt
+"""
 
 import argparse
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--complex_pdb', nargs='+', help=' complex pdb file name to extract the sequence from and use as a template')
+parser.add_argument('--complex_pdb', type=str, required=True, help=' complex pdb file name to extract the sequence from and use as a template')
 #parser.add_argument('--af-models',nargs='+', default="4", help='AlphaFold models to run (1-5)')
 #parser.add_argument('--af-nrecycles', type=int, default=3, help='Number of recycling iterations for AlphaFold')
 parser.add_argument('--scorefile', type=str, default="scores.csv", help='Scorefile name. (default = scores.csv)')
@@ -128,7 +130,8 @@ design_name=os.path.basename(complex_pdb)
 # remove the ligand from the pdb:
 pdb_str = pdb_to_string(complex_pdb)
 pdb_str_clean = rm_ligands(pdb_str)
-complex_pdb_clean=f"{complex_pdb.replace(".pdb","")}_nolig.pdb"
+path=complex_pdb.replace(".pdb","")
+complex_pdb_clean=f"{path}_nolig.pdb"
 with open(complex_pdb_clean, 'w') as f:
       f.write(pdb_str_clean)
 
@@ -139,19 +142,41 @@ structure = parser.get_structure("x", complex_pdb_clean)
 model = structure[0]             # first model
 chain = model["A"]               # chain A
 # count only standard residues
-residues = [res for res in chain.get_residues() if res.id[0] == " "]
-
+from Bio.PDB.Polypeptide import is_aa
+three_to_one = {
+    "ALA":"A","CYS":"C","ASP":"D","GLU":"E","PHE":"F","GLY":"G","HIS":"H","ILE":"I",
+    "LYS":"K","LEU":"L","MET":"M","ASN":"N","PRO":"P","GLN":"Q","ARG":"R","SER":"S",
+    "THR":"T","VAL":"V","TRP":"W","TYR":"Y",
+    # common variants
+    "MSE":"M",  # Selenomethionine
+}
+residues = [res for res in chain.get_residues() if is_aa(res, standard=True)]
+#print("residues:", residues)
+print("len residues:", len(residues))
 # extract/trim the binder sequence
 binder_length=len(residues)-256+1
-binder_sequence="".join(residues[:binder_lenght+1])
+print("binder len:", binder_length)
+#binder_sequence="".join(residues[:binder_length+1])
+# convert residues to one-letter sequence
+res_letters = []
+for res in residues[:binder_length+1]:
+    try:
+        aa = three_to_one[res.resname]
+        res_letters.append(aa)
+    except KeyError:
+        raise ValueError(f"Unknown residue: {res.resname} at {res.id}")
 
+binder_sequence = "".join(res_letters)
+print(binder_sequence)
 # change chain id for binder residues (from A to B):
 from Bio.PDB import PDBIO, Chain
 
 # change chain id for binder residues (from A to B):
 for model in structure:
     # Retrieve chain A (binder assumed to be first part)
+    chain_A = Chain.Chain("A")
     residues_A = list(chain_A.get_residues())
+    print("res A:", residues_A)
     if binder_length > len(residues_A):
         raise ValueError("binder_length exceeds number of residues in chain A")
     # Create new chain B
@@ -167,7 +192,8 @@ for model in structure:
     model.add(chain_B)
 
 # Save modified structure
-complex_pdb_clean_split = f"{complex_pdb_clean_split.replace('.pdb','')}_nolig_split.pdb"
+path=complex_pdb_clean.replace('.pdb','')
+complex_pdb_clean_split = f"{path}_nolig_split.pdb"
 
 io = PDBIO()
 io.set_structure(structure)
