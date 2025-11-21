@@ -29,8 +29,10 @@ import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--pdb", required=True, type=str, help="Input PDB")
+parser.add_argument("--backbone_pdb", required=True, type=str, help="pMPNN output backbone, single chain and with ligand PDB")
 args = parser.parse_args()
 INPUT_PDB = args.pdb
+BB_PDB=args.backbone_pdb
 
 
 
@@ -50,8 +52,16 @@ def str_ligands(pdb_str):
         if (line.startswith("HETATM"))
     ) + "\n"
 
-
-
+def to_one_chain(pdb_str, chain_id="A"):
+    lines=list()
+    for line in pdb_str.splitlines():
+        if (line.startswith("ATOM")):
+            chain = line[21:22]
+            if chain != chain_id:
+                line[21:22]=chain_id
+        lines.append(line)
+    return("\n".join(lines))   
+    
        
 MODRES = {'MSE':'MET','MLY':'LYS','FME':'MET','HYP':'PRO',
           'TPO':'THR','CSO':'CYS','SEP':'SER','M3L':'LYS',
@@ -188,13 +198,14 @@ def align_pdbs_from_strings(reference_pdb_str,
     return output.getvalue()
 
 
-def relax_me(pdb_in, pdb_out): # remove ligand, apply relaxation, put back ligand
+def relax_me(pdb_in, pdb_out, ligand_str, bb_pdb_str): #  apply relaxation, align, put back ligand
   #takes an input pdb write one after modification. 
   # also outputs the relaxed and realigned pdb str
+  bb_pdb_str_clean=rm_ligands(bb_pdb_str)
   pdb_str = pdb_to_string(pdb_in)
-  ligand_str = str_ligands(pdb_str)
-  pdb_str_clean = rm_ligands(pdb_str)
-  print(pdb_str_clean)
+  #ligand_str = str_ligands(pdb_str)
+  pdb_str_clean = to_one_chain(pdb_str, chain_id="A")
+  #print(pdb_str_clean)
   protein_obj = p_cf.from_pdb_string(pdb_str_clean)
   amber_relaxer = relax.AmberRelaxation(
     max_iterations=0,
@@ -204,8 +215,8 @@ def relax_me(pdb_in, pdb_out): # remove ligand, apply relaxation, put back ligan
     max_outer_iterations=3,
     use_gpu=True)
   relaxed_pdb_lines, _, _ = amber_relaxer.process(prot=protein_obj)
-  # align the relaxed pdb back into the original one
-  relaxed_aligned_pdb_lines=align_pdbs(reference_pdb_str=pdb_str_clean, align_pdb_str=relaxed_pdb_lines, reference_chain_id="A", align_chain_id="A")
+  # align the relaxed pdb back into the mpnn bb one
+  relaxed_aligned_pdb_lines=align_pdbs(reference_pdb_str=bb_pdb_str_clean, align_pdb_str=relaxed_pdb_lines, reference_chain_id="A", align_chain_id="A")
   with open(pdb_out, 'w') as f:
       f.write(relaxed_aligned_pdb_lines)
       f.write("\n")
@@ -213,9 +224,18 @@ def relax_me(pdb_in, pdb_out): # remove ligand, apply relaxation, put back ligan
       f.write("\n END")
   return(relaxed_aligned_pdb_lines + "\n" + ligand_str + "\n END")
 
+#-------------------------------------------------------------------------------------------------
+"""
+change repredicted PDB in order to have it as one chain
+relax it
+realign it to the pMPNN backbone
+put ligand back in
+save for lig MPNN pocket redesign
+"""
 
-
-
-# running the relaxation +...
+# running the relaxation 
+bb_pdb_str = pdb_to_string(BB_PDB)
+ligand_str = str_ligands(bb_pdb_str)
 pdb_name = os.path.basename(INPUT_PDB).replace(".pdb", "")
-relaxed_pdb_str=relax_me(INPUT_PDB, f"{pdb_name}relaxed.pdb")
+relaxed_pdb_str=relax_me(INPUT_PDB, f"{pdb_name}relaxed.pdb", ligand_str, bb_pdb_str) # also saves the relaxed aligned + ligand in pdb out
+print( f"Saved {pdb_name}relaxed.pdb")
