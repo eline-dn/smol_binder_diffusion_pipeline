@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 parser.add_argument('--complex_pdb', type=str, required=True, help=' complex pdb file name to extract the sequence from and use as a template')
 #parser.add_argument('--af-models',nargs='+', default="4", help='AlphaFold models to run (1-5)')
 #parser.add_argument('--af-nrecycles', type=int, default=3, help='Number of recycling iterations for AlphaFold')
-parser.add_argument('--scorefile', type=str, default="scores.csv", help='Scorefile name. (default = scores.csv)')
+#parser.add_argument('--scorefile', type=str, default="scores.csv", help='Scorefile name. (default = scores.csv)')
 
 args = parser.parse_args()
 
@@ -227,3 +227,4 @@ mpnn_complex_statistics = predict_binder_complex(prediction_model=complex_predic
                                                                     design_path= design_paths)
 
 print(f"Predicted complex structure for template {complex_pdb} \n Saved in {design_paths}")
+#mpnn_complex_statistics[0].get
