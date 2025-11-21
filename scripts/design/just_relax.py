@@ -73,6 +73,72 @@ def to_one_chain(pdb_str, chain_id="A"):
         new_lines.append(line)
     return "\n".join(new_lines)
 
+from Bio.PDB import PDBParser, PDBIO
+from Bio.PDB.StructureBuilder import StructureBuilder
+from io import StringIO
+
+def merge_chains_with_structurebuilder(input_pdb):
+    parser = PDBParser(QUIET=True)
+    structure = parser.get_structure("x", input_pdb)
+    model = structure[0]
+
+    if "A" not in model or "B" not in model:
+        raise ValueError("The PDB must contain both chain A and chain B")
+
+    chainA = model["A"]
+    chainB = model["B"]
+
+    # Initialize structure builder
+    sb = StructureBuilder()
+    sb.init_structure("merged")
+    sb.init_model(0)
+
+    # New merged chain will be called A
+    target_chain_id = "A"
+    sb.init_chain(target_chain_id)
+
+    residue_counter = 1
+
+    def add_chain(chain, residue_counter):
+        for res in chain:
+            hetflag, resseq, icode = res.id
+
+            sb.init_residue(res.get_resname(), hetflag=" ", resseq=residue_counter, icode=" ")
+            residue_counter += 1
+
+            for atom in res:
+                alt = atom.get_altloc()
+                if alt not in (" ", "A"):
+                    continue
+
+                sb.init_atom(
+                    name=atom.get_name(),
+                    coord=atom.get_coord(),
+                    bfactor=atom.get_bfactor(),
+                    occupancy=atom.get_occupancy(),
+                    altloc=" ",
+                    fullname=atom.get_fullname(),
+                    serial_number=None,
+                    element=atom.element
+                )
+        return residue_counter
+
+    # Append B then A
+    residue_counter = add_chain(chainB, residue_counter)
+    residue_counter = add_chain(chainA, residue_counter)
+
+    # Retrieve built structure
+    new_structure = sb.get_structure()
+
+    # --- CHANGE: write to string instead of file ---
+    io = PDBIO()
+    io.set_structure(new_structure)
+    buffer = StringIO()
+    io.save(buffer)
+    pdb_str = buffer.getvalue()
+
+    return pdb_str
+
     
        
 MODRES = {'MSE':'MET','MLY':'LYS','FME':'MET','HYP':'PRO',
@@ -214,9 +280,9 @@ def relax_me(pdb_in, pdb_out, ligand_str, bb_pdb_str): #  apply relaxation, alig
   #takes an input pdb write one after modification. 
   # also outputs the relaxed and realigned pdb str
   bb_pdb_str_clean=rm_ligands(bb_pdb_str)
-  pdb_str = pdb_to_string(pdb_in)
+  pdb_str_clean = merge_chains_with_structurebuilder(pdb_in)
   #ligand_str = str_ligands(pdb_str)
-  pdb_str_clean = to_one_chain(pdb_str, chain_id="A")
+  #pdb_str_clean = to_one_chain(pdb_str, chain_id="A")
   print(pdb_str_clean)
   protein_obj = p_cf.from_pdb_string(pdb_str_clean)
   amber_relaxer = relax.AmberRelaxation(
