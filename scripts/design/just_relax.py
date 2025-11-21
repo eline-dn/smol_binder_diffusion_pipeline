@@ -103,7 +103,7 @@ def merge_chains_with_structurebuilder(input_pdb):
         for res in chain:
             hetflag, resseq, icode = res.id
 
-            sb.init_residue(res.get_resname(), hetflag=" ", resseq=residue_counter, icode=" ")
+            sb.init_residue(res.get_resname(), field=" ", resseq=residue_counter, icode=" ")
             residue_counter += 1
 
             for atom in res:
