@@ -93,6 +93,72 @@ def merge_chains_with_structurebuilder(input_pdb):
     sb.init_structure("merged")
     sb.init_model(0)
 
+    # create one merged chain 'A'
+    sb.init_chain("A")
+
+    # --- IMPORTANT: init_seg sets self.segid used by init_residue internally ---
+    sb.init_seg("    ")  # 4-space segid, could be any 1-4 char string
+
+    residue_counter = 1
+
+    def add_chain(chain, residue_counter):
+        for res in chain:
+            # res.id is (hetflag, resseq, icode)
+            hetflag, _, icode = res.id
+
+            # Use documented signature: init_residue(resname, field, resseq, icode)
+            sb.init_residue(res.get_resname(), hetflag, residue_counter, icode or " ")
+            residue_counter += 1
+
+            for atom in res:
+                # keep only primary altlocs
+                alt = atom.get_altloc()
+                if alt not in (" ", "A"):
+                    continue
+
+                # StructureBuilder.init_atom(name, coord, bfactor, occupancy,
+                #                            altloc, fullname, serial_number, element)
+                sb.init_atom(
+                    atom.get_name(),
+                    atom.get_coord(),
+                    atom.get_bfactor(),
+                    atom.get_occupancy(),
+                    atom.get_altloc() if atom.get_altloc() != " " else " ",
+                    atom.get_fullname(),
+                    None,              # let builder assign serial number
+                    atom.element
+                )
+        return residue_counter
+
+    # Append chain B then chain A
+    residue_counter = add_chain(chainB, residue_counter)
+    residue_counter = add_chain(chainA, residue_counter)
+
+    # Retrieve built structure and write to an in-memory buffer
+    new_structure = sb.get_structure()
+    io = PDBIO()
+    io.set_structure(new_structure)
+    buffer = StringIO()
+    io.save(buffer)
+    return buffer.getvalue()
+
+
+def merge_chains_with_structurebuilder0(input_pdb):
+    parser = PDBParser(QUIET=True)
+    structure = parser.get_structure("x", input_pdb)
+    model = structure[0]
+
+    if "A" not in model or "B" not in model:
+        raise ValueError("The PDB must contain both chain A and chain B")
+
+    chainA = model["A"]
+    chainB = model["B"]
+
+    # Initialize structure builder
+    sb = StructureBuilder()
+    sb.init_structure("merged")
+    sb.init_model(0)
+
     # New merged chain will be called A
     target_chain_id = "A"
     sb.init_chain(target_chain_id)
