@@ -1,7 +1,7 @@
 """
-from the names of the binders that pass the first round of AF2 filters, get the pMPNN backbone outputs and repredict the complex strucure as a monomer with AF2 as a monomer
-align the ligand back into the structure 
+from the names of the binders that pass the first round of AF2 filters, get the pMPNN backbone outputs and repredict the complex strucure as a multimer with Colab Design
 run relaxation
+align the ligand back into the structure 
 run lig MPNN without rosetta and scoring stuff on relaxed structure
 (saves fasta output)
 """
@@ -38,6 +38,7 @@ PYTHON = {
     "proteinMPNN": f"{CONDAPATH}/envs/diffusion/bin/python",
     "general": f"{CONDAPATH}/envs/diffusion/bin/python",
     "ligandMPNN": f"{CONDAPATH}/envs/ligandmpnn_env/bin/python",
+    "ColabDesign": "/work/lpdi/users/mpacesa/Pipelines/miniforge3/envs/BindCraft_kuma/bin/python"
     "ligandMPNN_relax":f"{CONDAPATH}/envs/ligandmpnn_relax/bin/python"
     }
 PROJECT = "CID_1Z9Y"
@@ -55,6 +56,9 @@ os.chdir(f"{AF2_DIR}/good")
 good_af2_models = glob.glob(f"{AF2_DIR}/good/*.pdb") # these models only will be redesigned
 DESIGN_DIR_ligMPNN_alt= f"{WDIR}/3.1_design_pocket_ligandMPNN/alt"
 os.makedirs(DESIGN_DIR_ligMPNN_alt, exist_ok=True)
+DESIGN_DIR_ligMPNN_alt_af2= f"{WDIR}/3.1_design_pocket_ligandMPNN/alt/af2_reprediction"
+os.makedirs(DESIGN_DIR_ligMPNN_alt_af2, exist_ok=True)
+
 os.chdir(DESIGN_DIR_ligMPNN_alt)
 
 # get the "good" pMPNN backbones outputs (threaded with seq)
@@ -66,29 +70,29 @@ for design in good_af2_models:
  #--------------------------------------------------------------------------------------------------------------------------------------------
 """---------------------------------------------------------------------- repredict and relax structure:-------------------------------------------------------------------------"""
 #---------------------------------------------------------------------- 
+os.chdir(DESIGN_DIR_ligMPNN_alt_af2)
 
-
-commands_design = []
-cmds_filename_des = "commands_design"
+commands_reprediction = []
+cmds_filename_des = "commands_reprediction"
 with open(cmds_filename_des, "w") as file:
+    file.write("source ~/.bashrc \n BC_env \n"
     for pdb in good_pmpnn_bb: 
-        commands_design.append(f"{PYTHON['relax']} {SCRIPT_DIR}/scripts/design/relax_n_redesign.py " ### change name of the scipt and the pdbs!!!!
-                         f"--pdb {MPNN_DIR}/backbones/{pdb} --nstruct {NSTRUCT} --redesign_d_cutoff {distance_redesign_cutoffs} --target_positions {keep_nat}"
-                         f" --scoring {SCRIPT_DIR}/scripts/design/scoring/FUN_scoring.py --temperature {temperatures} \n" )
-        file.write(commands_design[-1])
+        commands_reprediction.append(f"{PYTHON['ColabDesign']} {SCRIPT_DIR}scripts/af2/repredict_w_templateBC.py "
+                         f"--pdb {MPNN_DIR}/backbones/{pdb}  \n" )
+        file.write(commands_reprediction[-1])
 
 
 print("Example design command:")
-print(commands_design[-1])
+print(commands_reprediction[-1])
 print("Number of commands:")
-print(len(commands_design))
+print(len(commands_reprediction))
 
 
 ### Running design jobs with Slurm.
-submit_script = "submit_design.sh"
-utils.create_slurm_submit_script(filename=submit_script, name="3.1_design_pocket_ligMPNN", mem="4g", 
-                                 N_cores=1, gpu=True, time="70:00:00", array=len(commands_design),
-                                 array_commandfile=cmds_filename_des, partition="h100", group=75)
+submit_script = "submit_reprediction.sh"
+utils.create_slurm_submit_script(filename=submit_script, name="3.1_reprediction", mem="4g", 
+                                 N_cores=1, gpu=True, time="70:00:00",
+                                 array_commandfile=cmds_filename_des, partition="h100")
 
 #--------------------------------------------------------------------------------------------------------------------------------------------
 """----------------------------------------------------------------------run lig MPNN on relaxed structure:-------------------------------------------------------------------------"""
