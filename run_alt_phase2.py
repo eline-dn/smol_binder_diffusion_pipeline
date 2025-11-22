@@ -38,7 +38,7 @@ PYTHON = {
     "proteinMPNN": f"{CONDAPATH}/envs/diffusion/bin/python",
     "general": f"{CONDAPATH}/envs/diffusion/bin/python",
     "ligandMPNN": f"{CONDAPATH}/envs/ligandmpnn_env/bin/python",
-    "ColabDesign": "/work/lpdi/users/mpacesa/Pipelines/miniforge3/envs/BindCraft_kuma/bin/python"
+    "ColabDesign": "/work/lpdi/users/mpacesa/Pipelines/miniforge3/envs/BindCraft_kuma/bin/python",
     "ligandMPNN_relax":f"{CONDAPATH}/envs/ligandmpnn_relax/bin/python"
     }
 PROJECT = "CID_1Z9Y"
@@ -68,17 +68,16 @@ for design in good_af2_models:
     name="_".join(sub[0:3])+"_"+sub[5]+"_"+sub[3]+".pdb"
     good_pmpnn_bb.append(name)
  #--------------------------------------------------------------------------------------------------------------------------------------------
-"""---------------------------------------------------------------------- repredict and relax structure:-------------------------------------------------------------------------"""
+"""---------------------------------------------------------------------- repredict structure:-------------------------------------------------------------------------"""
 #---------------------------------------------------------------------- 
 os.chdir(DESIGN_DIR_ligMPNN_alt_af2)
 
 commands_reprediction = []
 cmds_filename_des = "commands_reprediction"
 with open(cmds_filename_des, "w") as file:
-    file.write("source ~/.bashrc \n BC_env \n"
     for pdb in good_pmpnn_bb: 
-        commands_reprediction.append(f"{PYTHON['ColabDesign']} {SCRIPT_DIR}scripts/af2/repredict_w_templateBC.py "
-                         f"--pdb {MPNN_DIR}/backbones/{pdb}  \n" )
+        commands_reprediction.append(f"{PYTHON['ColabDesign']} {SCRIPT_DIR}/scripts/af2/repredict_w_templateBC.py "
+                         f"--complex_pdb {MPNN_DIR}/backbones/{pdb}  \n" )
         file.write(commands_reprediction[-1])
 
 
@@ -90,10 +89,56 @@ print(len(commands_reprediction))
 
 ### Running design jobs with Slurm.
 submit_script = "submit_reprediction.sh"
+"""
 utils.create_slurm_submit_script(filename=submit_script, name="3.1_reprediction", mem="4g", 
-                                 N_cores=1, gpu=True, time="70:00:00",
-                                 array_commandfile=cmds_filename_des, partition="h100")
+                                 N_cores=1, gpu=True, time="00:250:00",
+                                 array_commandfile=cmds_filename_des, array=2, group=223, partition="h100")
+"""
+""" !!! to add before submission:
+source /work/lpdi/users/mpacesa/Pipelines/miniforge3/bin/activate /work/lpdi/users/mpacesa/Pipelines/miniforge3/envs/BindCraft_kuma ; module load gcc/13.2 ; module load cuda/12.4.1 ; module load cudnn/8.9.7.29-12
 
+"""
+#--------------------------------------------------------------------------------------------------------------------------------------------
+"""----------------------------------------------------------------------relax structure and put ligand back in:-------------------------------------------------------------------------"""
+#----------------------------------------------------------------------
+"""
+change repredicted PDB in order to have it as one chain
+relax it
+realign it to the pMPNN backbone
+put ligand back in
+save for lig MPNN pocket redesign
+"""
+
+DESIGN_DIR_ligMPNN_alt_relax= f"{WDIR}/3.1_design_pocket_ligandMPNN/alt/relaxed"
+os.makedirs(DESIGN_DIR_ligMPNN_alt_relax, exist_ok=True)
+os.chdir(DESIGN_DIR_ligMPNN_alt_relax)
+
+commands_relaxation = []
+cmds_filename_des = "commands_relaxation"
+with open(cmds_filename_des, "w") as file:
+    for pdb in glob.glob(f"{DESIGN_DIR_ligMPNN_alt_af2}/*.pdb"): 
+        pdb_bb=os.path.basename(pdb)
+        pdb_bb=pdb_bb.replace("_model2.pdb", "")
+        commands_relaxation.append(f"{PYTHON['af2']} {SCRIPT_DIR}/scripts/design/just_relax.py "
+                         f"--pdb {pdb} --backbone_pdb {MPNN_DIR}/backbones/{pdb_bb} \n" )
+        file.write(commands_relaxation[-1])
+
+
+print("Example design command:")
+print(commands_relaxation[-1])
+print("Number of commands:")
+print(len(commands_relaxation))
+
+
+### Running design jobs with Slurm.
+submit_script = "submit_relaxation.sh"
+utils.create_slurm_submit_script(filename=submit_script, name="3.1_relax", mem="4g", 
+                                 N_cores=1, gpu=True, time="00:450:00",
+                                 array_commandfile=cmds_filename_des, array=2, group=225, partition="h100")
+
+"""
+/work/lpdi/users/eline/miniconda3/envs/mlfold/bin/python /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/design/just_relax.py --pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/3.1_design_pocket_ligandMPNN/alt/af2_reprediction/t2_2_33_2_T0.1.pdb_model2.pdb --backbone_pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/t2_2_33_2_T0.1.pdb
+"""
 #--------------------------------------------------------------------------------------------------------------------------------------------
 """----------------------------------------------------------------------run lig MPNN on relaxed structure:-------------------------------------------------------------------------"""
 #----------------------------------------------------------------------
