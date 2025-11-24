@@ -278,7 +278,7 @@ def align_pdbs_from_strings(reference_pdb_str,
                             align_pdb_str,
                             reference_chain_id,
                             align_chain_id):
-    """
+	"""
     Aligns align_pdb_str onto reference_pdb_str using CA atoms of the
     specified chains. Returns an aligned PDB string (does NOT write files).
     """
@@ -307,7 +307,7 @@ def align_pdbs_from_strings(reference_pdb_str,
     mov_chain_B = mov_model["B"]
     # Build CA maps
     def chain_ca_map(chain):
-        ca_map = {}
+		ca_map = {}
         for res in chain:
             if not is_aa(res, standard=True):
                 continue
@@ -317,14 +317,14 @@ def align_pdbs_from_strings(reference_pdb_str,
         return ca_map
 
 	def remap_chain_ca(chain, offset):
-    """Extract CA atoms and shift residue numbering by `offset`."""
-    mapping = {}
-    for res in chain:
-        if is_aa(res, standard=True) and "CA" in res:
-            old_id = res.get_id()      # (hetflag, resseq, icode)
-            new_resseq = old_id[1] + offset
-            mapping[(new_resseq, old_id[2])] = res["CA"]
-    return mapping
+	    """Extract CA atoms and shift residue numbering by `offset`."""
+	    mapping = {}
+	    for res in chain:
+			if is_aa(res, standard=True) and "CA" in res:
+				old_id = res.get_id()      # (hetflag, resseq, icode)
+	            new_resseq = old_id[1] + offset
+	            mapping[(new_resseq, old_id[2])] = res["CA"]
+	    return mapping
 
     # count residues in the reference corresponding to chain B
     n_ref_B = len([r for r in ref_chain if is_aa(r, standard=True)])   # your ref already merged
