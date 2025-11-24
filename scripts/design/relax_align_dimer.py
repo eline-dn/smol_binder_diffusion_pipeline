@@ -442,11 +442,14 @@ else:
                                align_pdb_str=pdb_lines, 
                                reference_chain_id="A", align_chain_id="B")
   print("ligand:", ligand_str)
-  with open(pdb_out, 'w') as f:
-      f.write(aligned_pdb_lines)
-      f.write("\n")
+  lines = aligned_pdb_lines.splitlines()
+  if lines[-1].startswith(("END", "ENDMDL")):
+	  lines = lines[:-1]
+
+  with open(pdb_out, "w") as f:
+	  f.write("\n".join(lines))
       f.write(ligand_str)
-      f.write("\n END")
+      f.write("\nEND")
   
   print("aligned and added ligand")
 	
