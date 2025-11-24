@@ -18,21 +18,6 @@ from colabdesign.af.alphafold.common import protein
 from colabdesign.shared.protein import renum_pdb_str
 from colabdesign.af.alphafold.common import residue_constants
 
-
-
-
-
-
-
-
-from alphafold.relax import relax
-from alphafold.relax import utils
-from alphafold.common import protein as p_cf
-
-from colabdesign.af.alphafold.common import protein
-from colabdesign.shared.protein import renum_pdb_str
-from colabdesign.af.alphafold.common import residue_constants
-
 import pdbfixer
 import numpy as np
 import jax
@@ -196,7 +181,7 @@ def get_best_seq(aux):
 
 
 
-
+"""
 # load all sequences, remove duplicates
 sequences = []
 names = []
@@ -213,15 +198,70 @@ for file in glob.glob('path-to-your-mpnn-outputs/*.pickle'): # should rewrite th
             n += 1
         else:
             print('duplicate found!')
+"""
+# main:
+
+import argparse
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument('--complex_pdb', type=str, required=True, help=' complex pdb file name to extract the sequence from and use as a template') # e.g. the output from pMPNN
+#parser.add_argument('--af-models',nargs='+', default="4", help='AlphaFold models to run (1-5)')
+#parser.add_argument('--af-nrecycles', type=int, default=3, help='Number of recycling iterations for AlphaFold')
+#parser.add_argument('--scorefile', type=str, default="scores.csv", help='Scorefile name. (default = scores.csv)')
+
+args = parser.parse_args()
+
+complex_pdb=args.complex_pdb # needs to be split in order to separate binder from target (change chain label for binder residues in pMPNN output)
+design_name=os.path.basename(complex_pdb)
+params = '/work/lpdi/users/goldbach/software/colabdesign/params'
 
 # repredict all sequences using partially masked templates
-af_model = mk_af_model(protocol='fixbb', use_templates=True, data_dir='path-to-AF2-params')
-af_model.prep_inputs(pdb_filename='target-pdb', chain='A')
+af_model = mk_af_model(protocol='fixbb', use_templates=True, data_dir=params)
+af_model.prep_inputs(pdb_filename=complex_pdb, chain='A')
 
-# Mask design positions from template # You should provide designed amino acid positions. Check if it requires a list or a string
-for j in design_pos:
-    af_model._inputs['batch']['all_atom_mask'][j-1,:] = np.zeros_like(af_model._inputs['batch']['all_atom_mask'][j-1,:])
+# get sequence:
+from Bio.PDB import PDBParser
+parser = PDBParser(QUIET=True)
+structure = parser.get_structure("x", complex_pdb)
+model = structure[0]             # first model
+chain = model["A"]               # chain A
+# count only standard residues
+from Bio.PDB.Polypeptide import is_aa
+three_to_one = {
+    "ALA":"A","CYS":"C","ASP":"D","GLU":"E","PHE":"F","GLY":"G","HIS":"H","ILE":"I",
+    "LYS":"K","LEU":"L","MET":"M","ASN":"N","PRO":"P","GLN":"Q","ARG":"R","SER":"S",
+    "THR":"T","VAL":"V","TRP":"W","TYR":"Y",
+    # common variants
+    "MSE":"M",  # Selenomethionine
+}
+residues = [res for res in chain.get_residues() if is_aa(res, standard=True)]
+# convert residues to one-letter sequence
+res_letters = []
+for res in residues:
+    try:
+        aa = three_to_one[res.resname]
+        res_letters.append(aa)
+    except KeyError:
+        raise ValueError(f"Unknown residue: {res.resname} at {res.id}")
 
+seq = "".join(res_letters)
+print("sequence:",seq)
+ 
+
+af_model.set_seq(seq)
+af_model.predict(num_recycles=3, models = [1], num_models=1)
+# write pdb:
+design_name=os.path.basename(complex_pdb).replace(".pdb", "")
+prediction_pdb= f"{design_name}_model1.pdb")
+af_model.save_pdb(prediction_pdb)
+
+# Mask design positions from template # You should provide designed amino acid positions.
+#design_pos=
+#for j in design_pos: 
+
+# af_model._inputs['batch']['all_atom_mask'][j-1,:] = np.zeros_like(af_model._inputs['batch']['all_atom_mask'][j-1,:])
+
+# not masking anything
+"""
 for i in tqdm(range(len(sequences))):
     seq = sequences[i]
     name = names[i]
@@ -236,7 +276,7 @@ for i in tqdm(range(len(sequences))):
          pdb_out = pdb.split('.pdb')[0] + '_relaxed.pdb'
          relax_me(pdb, pdb_out)
          #os.remove(pdb) # delete unrelaxed pdb file
-
+"""
   """
     best_d = af_model.aux['all']
     
