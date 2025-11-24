@@ -251,7 +251,7 @@ af_model.set_seq(seq)
 af_model.predict(num_recycles=3, models = [1], num_models=1)
 # write pdb:
 design_name=os.path.basename(complex_pdb).replace(".pdb", "")
-prediction_pdb= f"{design_name}_model1.pdb")
+prediction_pdb= f"{design_name}_model1.pdb"
 af_model.save_pdb(prediction_pdb)
 
 # Mask design positions from template # You should provide designed amino acid positions.
@@ -277,7 +277,7 @@ for i in tqdm(range(len(sequences))):
          relax_me(pdb, pdb_out)
          #os.remove(pdb) # delete unrelaxed pdb file
 """
-  """
+"""
     best_d = af_model.aux['all']
     
     del best_d['cmap']

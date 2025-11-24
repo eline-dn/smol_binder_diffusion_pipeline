@@ -255,7 +255,8 @@ def align_pdbs_from_strings(reference_pdb_str,
 
     fixed_atoms = [ref_ca[k] for k in common_keys]
     moving_atoms = [mov_ca[k] for k in common_keys]
-
+    print("fixed atoms:", fixed_atoms)
+    print("moving atoms:", moving_atoms)
     # Superimpose
     sup = Superimposer()
     sup.set_atoms(fixed_atoms, moving_atoms)
@@ -292,7 +293,7 @@ def relax_me(pdb_in, pdb_out, ligand_str, bb_pdb_str): #  apply relaxation, alig
     use_gpu=True)
   relaxed_pdb_lines, _, _ = amber_relaxer.process(prot=protein_obj)
   # align the relaxed pdb back into the mpnn bb one
-  relaxed_aligned_pdb_lines=align_pdbs(reference_pdb_str=bb_pdb_str_clean, align_pdb_str=relaxed_pdb_lines, reference_chain_id="A", align_chain_id="A")
+  relaxed_aligned_pdb_lines=align_pdbs_from_strings(reference_pdb_str=bb_pdb_str_clean, align_pdb_str=relaxed_pdb_lines, reference_chain_id="A", align_chain_id="A")
   with open(pdb_out, 'w') as f:
       f.write(relaxed_aligned_pdb_lines)
       f.write("\n")
@@ -321,12 +322,13 @@ else:
   bb_pdb_str_clean=rm_ligands(bb_pdb_str)
   pdb_lines=pdb_to_string(INPUT_PDB)
   pdb_out=f"{pdb_name}_w_ligand.pdb"
-  aligned_pdb_lines=align_pdbs(reference_pdb_str=bb_pdb_str_clean, 
+  aligned_pdb_lines=align_pdbs_from_strings(reference_pdb_str=bb_pdb_str_clean, 
                                align_pdb_str=pdb_lines, 
-                               reference_chain_id="A", align_chain_id="A")
+                               reference_chain_id="A", align_chain_id="B")
   with open(pdb_out, 'w') as f:
       f.write(aligned_pdb_lines)
       f.write("\n")
       f.write(ligand_str)
       f.write("\n END")
-  return(aligned_pdb_lines + "\n" + ligand_str + "\n END")
+  print("aligned and added ligand")
+	
