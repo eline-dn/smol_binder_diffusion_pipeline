@@ -414,6 +414,7 @@ save for lig MPNN pocket redesign
 """
 
 bb_pdb_str = pdb_to_string(BB_PDB)
+print("bb pdb_str:" , bb_pdb_str)
 ligand_str = str_ligands(bb_pdb_str)
 pdb_name = os.path.basename(INPUT_PDB).replace(".pdb", "")
 if RELAX:# running the relaxation 
