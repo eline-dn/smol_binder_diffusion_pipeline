@@ -274,6 +274,7 @@ def align_pdbs_from_strings0og(reference_pdb_str,
 
     return output.getvalue()
 
+
 def align_pdbs_from_strings(reference_pdb_str,
                             align_pdb_str,
                             reference_chain_id,
@@ -303,11 +304,13 @@ def align_pdbs_from_strings(reference_pdb_str,
         mov_chain = mov_model[align_chain_id]
     except KeyError:
         raise ValueError(f"Align chain '{align_chain_id}' not found.")
+
     mov_chain_A = mov_model["A"]
     mov_chain_B = mov_model["B"]
+
     # Build CA maps
     def chain_ca_map(chain):
-		ca_map = {}
+        ca_map = {}
         for res in chain:
             if not is_aa(res, standard=True):
                 continue
@@ -316,18 +319,21 @@ def align_pdbs_from_strings(reference_pdb_str,
                 ca_map[(res_id[1], res_id[2])] = res["CA"]
         return ca_map
 
-	def remap_chain_ca(chain, offset):
-	    """Extract CA atoms and shift residue numbering by `offset`."""
-	    mapping = {}
-	    for res in chain:
-			if is_aa(res, standard=True) and "CA" in res:
-				old_id = res.get_id()      # (hetflag, resseq, icode)
-	            new_resseq = old_id[1] + offset
-	            mapping[(new_resseq, old_id[2])] = res["CA"]
-	    return mapping
+    def remap_chain_ca(chain, offset):
+        """Extract CA atoms and shift residue numbering by `offset`."""
+        mapping = {}
+        for res in chain:
+            if is_aa(res, standard=True) and "CA" in res:
+                old_id = res.get_id()  # (hetflag, resseq, icode)
+                new_resseq = old_id[1] + offset
+                mapping[(new_resseq, old_id[2])] = res["CA"]
+        return mapping
+
+    # Build CA map for reference chain
+    ref_ca = chain_ca_map(ref_chain)
 
     # count residues in the reference corresponding to chain B
-    n_ref_B = len([r for r in ref_chain if is_aa(r, standard=True)])   # your ref already merged
+    n_ref_B = len([r for r in ref_chain if is_aa(r, standard=True)])
 
     # mov_chain_B should map to residues 1..n_ref_B
     mov_B_map = remap_chain_ca(mov_chain_B, offset=0)
@@ -337,7 +343,6 @@ def align_pdbs_from_strings(reference_pdb_str,
 
     # merge them
     mov_ca = {**mov_B_map, **mov_A_map}
-
 
     common_keys = sorted(
         set(ref_ca.keys()).intersection(mov_ca.keys()),
@@ -351,8 +356,10 @@ def align_pdbs_from_strings(reference_pdb_str,
 
     fixed_atoms = [ref_ca[k] for k in common_keys]
     moving_atoms = [mov_ca[k] for k in common_keys]
+
     print("fixed atoms:", fixed_atoms)
     print("moving atoms:", moving_atoms)
+
     # Superimpose
     sup = Superimposer()
     sup.set_atoms(fixed_atoms, moving_atoms)
@@ -369,6 +376,7 @@ def align_pdbs_from_strings(reference_pdb_str,
     io.save(output)
 
     return output.getvalue()
+
 
 def relax_me(pdb_in, pdb_out, ligand_str, bb_pdb_str): #  apply relaxation, align, put back ligand
   #takes an input pdb write one after modification. 
