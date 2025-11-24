@@ -303,8 +303,8 @@ def align_pdbs_from_strings(reference_pdb_str,
         mov_chain = mov_model[align_chain_id]
     except KeyError:
         raise ValueError(f"Align chain '{align_chain_id}' not found.")
-	mov_chain_A = mov_model["A"]
-	mov_chain_B = mov_model["B"]
+    mov_chain_A = mov_model["A"]
+    mov_chain_B = mov_model["B"]
     # Build CA maps
     def chain_ca_map(chain):
         ca_map = {}
@@ -327,16 +327,16 @@ def align_pdbs_from_strings(reference_pdb_str,
     return mapping
 
     # count residues in the reference corresponding to chain B
-	n_ref_B = len([r for r in ref_chain if is_aa(r, standard=True)])   # your ref already merged
-	
-	# mov_chain_B should map to residues 1..n_ref_B
-	mov_B_map = remap_chain_ca(mov_chain_B, offset=0)
-	
-	# mov_chain_A should map to residues n_ref_B+1..end
-	mov_A_map = remap_chain_ca(mov_chain_A, offset=n_ref_B)
-	
-	# merge them
-	mov_ca = {**mov_B_map, **mov_A_map}
+    n_ref_B = len([r for r in ref_chain if is_aa(r, standard=True)])   # your ref already merged
+
+    # mov_chain_B should map to residues 1..n_ref_B
+    mov_B_map = remap_chain_ca(mov_chain_B, offset=0)
+
+    # mov_chain_A should map to residues n_ref_B+1..end
+    mov_A_map = remap_chain_ca(mov_chain_A, offset=n_ref_B)
+
+    # merge them
+    mov_ca = {**mov_B_map, **mov_A_map}
 
 
     common_keys = sorted(
