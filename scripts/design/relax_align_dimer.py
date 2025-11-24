@@ -278,7 +278,7 @@ def align_pdbs_from_strings(reference_pdb_str,
                             align_pdb_str,
                             reference_chain_id,
                             align_chain_id):
-	"""
+    """
     Aligns align_pdb_str onto reference_pdb_str using CA atoms of the
     specified chains. Returns an aligned PDB string (does NOT write files).
     """
