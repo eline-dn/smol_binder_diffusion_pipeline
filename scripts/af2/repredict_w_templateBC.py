@@ -208,8 +208,8 @@ design_paths="./"
 # compile complex prediction model
 complex_prediction_model = mk_afdesign_model(protocol="binder", num_recycles=3, data_dir=params, 
                                             use_multimer=True,
-                                             use_initial_guess=False, #Introduce bias by providing binder atom positions as a starting point for prediction.
-                                             use_initial_atom_pos=False) # Introduce atom position bias into the structure module for atom initilisation.
+                                             use_initial_guess=True, #Introduce bias by providing binder atom positions as a starting point for prediction.
+                                             use_initial_atom_pos=True) # Introduce atom position bias into the structure module for atom initilisation.
 
 complex_prediction_model.prep_inputs(pdb_filename=complex_pdb_clean_split,
                                          chain='A',
