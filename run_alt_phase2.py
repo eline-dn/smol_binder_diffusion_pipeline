@@ -70,6 +70,7 @@ for design in good_af2_models:
  #--------------------------------------------------------------------------------------------------------------------------------------------
 """---------------------------------------------------------------------- repredict structure:-------------------------------------------------------------------------"""
 #---------------------------------------------------------------------- 
+"""
 os.makedirs(f"{DESIGN_DIR_ligMPNN_alt_af2}/monomer", exist_ok=True)
 os.chdir(f"{DESIGN_DIR_ligMPNN_alt_af2}/monomer")
 
@@ -86,7 +87,7 @@ print("Example design command:")
 print(commands_reprediction[-1])
 print("Number of commands:")
 print(len(commands_reprediction))
-
+"""
 """test
 /work/lpdi/users/mpacesa/Pipelines/miniforge3/envs/BindCraft_kuma/bin/python /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/af2/repredict_from_template.py --complex_pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/t2_1_74_4_T0.2.pdb
 """
@@ -106,27 +107,27 @@ source /work/lpdi/users/mpacesa/Pipelines/miniforge3/bin/activate /work/lpdi/use
 """
 two options: fixedbb protocol, as a monomer, or binder protocol, as a dimer but using a template for the binder + intial guess + init_atom_pos"""
 #--------------------------------------------------------------------------------------------------------------------------------------------
-"""----------------------------------------------------------------------relax structure and put ligand back in:-------------------------------------------------------------------------"""
+"""----------------------------------------------------------------------(relax?), align structure and put ligand back in:-------------------------------------------------------------------------"""
 #----------------------------------------------------------------------
 """
-change repredicted PDB in order to have it as one chain
-relax it
+relax it (optionnal)
 realign it to the pMPNN backbone
 put ligand back in
 save for lig MPNN pocket redesign
 """
-
-DESIGN_DIR_ligMPNN_alt_relax= f"{WDIR}/3.1_design_pocket_ligandMPNN/alt/relaxed"
+"""
+complex_folder=f"{WDIR}/3.1_design_pocket_ligandMPNN/alt/af2_reprediction/use_init" # where to find the repredicted pdb structures
+DESIGN_DIR_ligMPNN_alt_relax= f"{WDIR}/3.1_design_pocket_ligandMPNN/alt/with_lig"
 os.makedirs(DESIGN_DIR_ligMPNN_alt_relax, exist_ok=True)
 os.chdir(DESIGN_DIR_ligMPNN_alt_relax)
 
 commands_relaxation = []
 cmds_filename_des = "commands_relaxation"
 with open(cmds_filename_des, "w") as file:
-    for pdb in glob.glob(f"{DESIGN_DIR_ligMPNN_alt_af2}/*.pdb"): 
+    for pdb in glob.glob(f"{complex_folder}/*.pdb"): 
         pdb_bb=os.path.basename(pdb)
         pdb_bb=pdb_bb.replace("_model2.pdb", "")
-        commands_relaxation.append(f"{PYTHON['af2']} {SCRIPT_DIR}/scripts/design/just_relax.py "
+        commands_relaxation.append(f"{PYTHON['af2']} {SCRIPT_DIR}/scripts/design/relax_align_dimer.py "
                          f"--pdb {pdb} --backbone_pdb {MPNN_DIR}/backbones/{pdb_bb} \n" )
         file.write(commands_relaxation[-1])
 
@@ -139,49 +140,51 @@ print(len(commands_relaxation))
 
 ### Running design jobs with Slurm.
 submit_script = "submit_relaxation.sh"
-utils.create_slurm_submit_script(filename=submit_script, name="3.1_relax", mem="4g", 
+utils.create_slurm_submit_script(filename=submit_script, name="3.1_lig", mem="4g", 
                                  N_cores=1, gpu=True, time="00:450:00",
                                  array_commandfile=cmds_filename_des, array=2, group=225, partition="h100")
-
 """
-/work/lpdi/users/eline/miniconda3/envs/mlfold/bin/python /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/design/just_relax.py --pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/3.1_design_pocket_ligandMPNN/alt/af2_reprediction/t2_2_33_2_T0.1.pdb_model2.pdb --backbone_pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/t2_2_33_2_T0.1.pdb
+"""
+/work/lpdi/users/eline/miniconda3/envs/mlfold/bin/python /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/design/relax_align_dimer.py --pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/3.1_design_pocket_ligandMPNN/alt/af2_reprediction/use_init/t2_2_33_2_T0.1.pdb_model2.pdb --backbone_pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/t2_2_33_2_T0.1.pdb
 """
 #--------------------------------------------------------------------------------------------------------------------------------------------
-"""----------------------------------------------------------------------run lig MPNN on relaxed structure:-------------------------------------------------------------------------"""
+"""----------------------------------------------------------------------run lig MPNN on structure:-------------------------------------------------------------------------"""
 #----------------------------------------------------------------------
 NSTRUCT=2
+DESIGN_DIR_ligMPNNoutput= f"{WDIR}/3.1_design_pocket_ligandMPNN/alt/ligMPNN_output"
+DESIGN_DIR_ligMPNN_alt_relax= f"{WDIR}/3.1_design_pocket_ligandMPNN/alt/with_lig"
+os.makedirs(DESIGN_DIR_ligMPNNoutput, exist_ok=True)
+os.chdir(DESIGN_DIR_ligMPNNoutput)
+
+
 from Bio.PDB import PDBParser
 parser = PDBParser(QUIET=True)
 commands_design = []
 cmds_filename_des = "commands_design"
 with open(cmds_filename_des, "w") as file:
-    for pdb in good_pmpnn_bb: ### change
-        structure = parser.get_structure("x", f"{MPNN_DIR}/backbones/{pdb}")### change
+    for pdb in glob.glob(f"{DESIGN_DIR_ligMPNN_alt_relax}/*.pdb"): ### 
+        structure = parser.get_structure("x", pdb) ### 
         model = structure[0]             
         chain = model["A"]               
         # count only standard residues
-        residues = [res for res in chain.get_residues() if res.id[0] == " "]
-        target_reslist=list(map(str,range(len(residues)-256+1,len(residues))))
+        residues = [res for res in chain.get_residues() if res.id[0] == " "] #need to have a list of ids with a chain id : A1, A2, ... 
+        target_reslist=list(map(str,range(1,len(residues)))) # all the res id that belong to chain A, i.e. to the target
         #print(pdb +f"native res from the target: {target_reslist[0]}-{target_reslist[-1]}")
         keep_nat=" ".join(target_reslist) # these belong to the target protein and should not be re-designed
         temperatures=" ".join(list(("0.2", "0.3")))
         distance_redesign_cutoffs = " ".join(list(("8.0", "15.0", "500.0")))
-        commands_design.append(f"{PYTHON['ligandMPNN_relax']} {SCRIPT_DIR}/scripts/design/relax_n_redesign.py " ### change name of the scipt and the pdbs!!!!
-                         f"--pdb {MPNN_DIR}/backbones/{pdb} --nstruct {NSTRUCT} --redesign_d_cutoff {distance_redesign_cutoffs} --target_positions {keep_nat}"
-                         f" --scoring {SCRIPT_DIR}/scripts/design/scoring/FUN_scoring.py --temperature {temperatures} \n" )
+        commands_design.append(f"{PYTHON['ligandMPNN']} {SCRIPT_DIR}/scripts/design/simple_redesign.py " ### change name of the scipt and the pdbs!!!!
+                         f"--pdb {pdb} --nstruct {NSTRUCT} --redesign_d_cutoff {distance_redesign_cutoffs} --target_positions {keep_nat}"
+                         f" --temperature {temperatures} \n" )
         file.write(commands_design[-1])
 
-"""test
-/work/lpdi/users/eline/miniconda3/envs/ligandmpnn_env/bin/python /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/design/ligMPNN_light_pocket_design.py --pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/t2_1_20_1_T0.2.pdb --scoring /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/design/scoring/FUN_scoring.py --redesign_d_cutoff 8.0 --target_positions 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208 209 210 211 212 213 214 215 216 217 218 219 220 221 222 223 224 225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240 241 242 243 244 245 246 247 248 249 250 251 252 253 254 255 256 257 258 259 260 261 262 263 264 265 266 267 268 269 270 271 272 273 274 275 276 277 278 279 280 281 282 283 284 285 286 287 288 289 290 291 292 293 294 295 296 297 298 299 300 301 302 303 304 305 306 307 308 309 310 311 312 313 314 315 316 317 318 319 320 321 322 323 324 325 326 327 328 329 330 331 332 333 334 335 336 337 338 339 340 341 342 343 344 345 346 347 348 349 350 351 352 353 354 355 356 357 358 359 360 361 362 363 364 365 366 367 368 369 370 371 372 373 374 375 376 377 378 379 380 381 382 383 384 385 386 387 388 389 390 391 392 393 394 395 --nstruct 5
-"""
+
 print("Example design command:")
 print(commands_design[-1])
 print("Number of commands:")
 print(len(commands_design))
 
-"""another test:
-/work/lpdi/users/eline/miniconda3/envs/ligandmpnn_relax/bin/python /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/design/relax_n_redesign.py --pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/t2_1_74_4_T0.2.pdb --nstruct 2 --redesign_d_cutoff 8.0 15.0 500.0 --target_positions 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208 209 210 211 212 213 214 215 216 217 218 219 220 221 222 223 224 225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240 241 242 243 244 245 246 247 248 249 250 251 252 253 254 255 256 257 258 259 260 261 262 263 264 265 266 267 268 269 270 271 272 273 274 275 276 277 278 279 280 281 282 283 284 285 286 287 288 289 290 291 292 293 294 295 296 297 298 299 300 301 302 303 304 305 306 307 308 309 310 311 312 313 314 315 316 317 318 319 320 321 322 323 324 325 326 327 328 329 330 331 332 333 334 335 336 337 338 339 --temperature 0.2 0.3
-"""
+
 ### Running design jobs with Slurm.
 submit_script = "submit_design.sh"
 utils.create_slurm_submit_script(filename=submit_script, name="3.1_design_pocket_ligMPNN", mem="4g", 
