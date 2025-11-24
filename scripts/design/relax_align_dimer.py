@@ -404,6 +404,18 @@ def relax_me(pdb_in, pdb_out, ligand_str, bb_pdb_str): #  apply relaxation, alig
       f.write("\n END")
   return(relaxed_aligned_pdb_lines + "\n" + ligand_str + "\n END")
 
+def pdb_file_to_str_bpy(pdb_path):
+    parser = PDBParser(QUIET=True)
+    structure = parser.get_structure("prot", pdb_path)
+
+    io = PDBIO()
+    io.set_structure(structure)
+
+    output = StringIO()
+    io.save(output)
+
+    return output.getvalue()
+
 #-------------------------------------------------------------------------------------------------
 """
 
@@ -413,7 +425,7 @@ put ligand back in
 save for lig MPNN pocket redesign
 """
 
-bb_pdb_str = pdb_to_string(BB_PDB)
+bb_pdb_str = pdb_file_to_str_bpy(BB_PDB)
 print("bb pdb_str:" , bb_pdb_str)
 ligand_str = str_ligands(bb_pdb_str)
 pdb_name = os.path.basename(INPUT_PDB).replace(".pdb", "")
