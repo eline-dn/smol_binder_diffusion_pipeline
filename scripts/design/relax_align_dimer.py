@@ -447,9 +447,10 @@ else:
 	  lines = lines[:-1]
 
   with open(pdb_out, "w") as f:
-	  f.write("\n".join(lines))
-      f.write(ligand_str)
-      f.write("\nEND")
-  
-  print("aligned and added ligand")
-	
+          f.write("\n".join(lines))
+          f.write("\n")
+          f.write(ligand_str)
+          f.write("\nEND")
+
+print("aligned and added ligand")
+
