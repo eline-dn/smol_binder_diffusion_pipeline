@@ -428,10 +428,12 @@ else:
   aligned_pdb_lines=align_pdbs_from_strings(reference_pdb_str=bb_pdb_str_clean, 
                                align_pdb_str=pdb_lines, 
                                reference_chain_id="A", align_chain_id="B")
+  print("ligand:", ligand_str)
   with open(pdb_out, 'w') as f:
       f.write(aligned_pdb_lines)
       f.write("\n")
       f.write(ligand_str)
       f.write("\n END")
+  
   print("aligned and added ligand")
 	
