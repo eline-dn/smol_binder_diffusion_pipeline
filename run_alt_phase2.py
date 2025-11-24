@@ -70,13 +70,14 @@ for design in good_af2_models:
  #--------------------------------------------------------------------------------------------------------------------------------------------
 """---------------------------------------------------------------------- repredict structure:-------------------------------------------------------------------------"""
 #---------------------------------------------------------------------- 
-os.chdir(DESIGN_DIR_ligMPNN_alt_af2)
+os.makedirs(f"{DESIGN_DIR_ligMPNN_alt_af2}/monomer", exist_ok=True)
+os.chdir(f"{DESIGN_DIR_ligMPNN_alt_af2}/monomer")
 
 commands_reprediction = []
 cmds_filename_des = "commands_reprediction"
 with open(cmds_filename_des, "w") as file:
     for pdb in good_pmpnn_bb: 
-        commands_reprediction.append(f"{PYTHON['ColabDesign']} {SCRIPT_DIR}/scripts/af2/repredict_w_templateBC.py "
+        commands_reprediction.append(f"{PYTHON['ColabDesign']} {SCRIPT_DIR}/scripts/af2/repredict_from_template.py "
                          f"--complex_pdb {MPNN_DIR}/backbones/{pdb}  \n" )
         file.write(commands_reprediction[-1])
 
@@ -85,6 +86,10 @@ print("Example design command:")
 print(commands_reprediction[-1])
 print("Number of commands:")
 print(len(commands_reprediction))
+
+"""test
+/work/lpdi/users/mpacesa/Pipelines/miniforge3/envs/BindCraft_kuma/bin/python /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/af2/repredict_from_template.py --complex_pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/t2_1_74_4_T0.2.pdb
+"""
 
 
 ### Running design jobs with Slurm.
@@ -98,6 +103,8 @@ utils.create_slurm_submit_script(filename=submit_script, name="3.1_reprediction"
 source /work/lpdi/users/mpacesa/Pipelines/miniforge3/bin/activate /work/lpdi/users/mpacesa/Pipelines/miniforge3/envs/BindCraft_kuma ; module load gcc/13.2 ; module load cuda/12.4.1 ; module load cudnn/8.9.7.29-12
 
 """
+"""
+two options: fixedbb protocol, as a monomer, or binder protocol, as a dimer but using a template for the binder + intial guess + init_atom_pos"""
 #--------------------------------------------------------------------------------------------------------------------------------------------
 """----------------------------------------------------------------------relax structure and put ligand back in:-------------------------------------------------------------------------"""
 #----------------------------------------------------------------------
