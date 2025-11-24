@@ -199,7 +199,7 @@ def pdb_to_string(pdb_file, chains=None, models=[1]):
   return "\n".join(lines)
 
 
-def align_pdbs_from_strings(reference_pdb_str,
+def align_pdbs_from_strings0og(reference_pdb_str,
                             align_pdb_str,
                             reference_chain_id,
                             align_chain_id):
@@ -228,7 +228,7 @@ def align_pdbs_from_strings(reference_pdb_str,
         mov_chain = mov_model[align_chain_id]
     except KeyError:
         raise ValueError(f"Align chain '{align_chain_id}' not found.")
-
+	
     # Build CA maps
     def chain_ca_map(chain):
         ca_map = {}
@@ -274,6 +274,101 @@ def align_pdbs_from_strings(reference_pdb_str,
 
     return output.getvalue()
 
+def align_pdbs_from_strings(reference_pdb_str,
+                            align_pdb_str,
+                            reference_chain_id,
+                            align_chain_id):
+    """
+    Aligns align_pdb_str onto reference_pdb_str using CA atoms of the
+    specified chains. Returns an aligned PDB string (does NOT write files).
+    """
+
+    reference_chain_id = reference_chain_id.split(',')[0].strip()
+    align_chain_id = align_chain_id.split(',')[0].strip()
+
+    parser = PDBParser(QUIET=True)
+
+    ref_struct = parser.get_structure("ref", StringIO(reference_pdb_str))
+    mov_struct = parser.get_structure("mov", StringIO(align_pdb_str))
+
+    ref_model = next(ref_struct.get_models())
+    mov_model = next(mov_struct.get_models())
+
+    # Fetch chains
+    try:
+        ref_chain = ref_model[reference_chain_id]
+    except KeyError:
+        raise ValueError(f"Reference chain '{reference_chain_id}' not found.")
+    try:
+        mov_chain = mov_model[align_chain_id]
+    except KeyError:
+        raise ValueError(f"Align chain '{align_chain_id}' not found.")
+	mov_chain_A = mov_model["A"]
+	mov_chain_B = mov_model["B"]
+    # Build CA maps
+    def chain_ca_map(chain):
+        ca_map = {}
+        for res in chain:
+            if not is_aa(res, standard=True):
+                continue
+            if "CA" in res:
+                res_id = res.get_id()
+                ca_map[(res_id[1], res_id[2])] = res["CA"]
+        return ca_map
+
+	def remap_chain_ca(chain, offset):
+    """Extract CA atoms and shift residue numbering by `offset`."""
+    mapping = {}
+    for res in chain:
+        if is_aa(res, standard=True) and "CA" in res:
+            old_id = res.get_id()      # (hetflag, resseq, icode)
+            new_resseq = old_id[1] + offset
+            mapping[(new_resseq, old_id[2])] = res["CA"]
+    return mapping
+
+    # count residues in the reference corresponding to chain B
+	n_ref_B = len([r for r in ref_chain if is_aa(r, standard=True)])   # your ref already merged
+	
+	# mov_chain_B should map to residues 1..n_ref_B
+	mov_B_map = remap_chain_ca(mov_chain_B, offset=0)
+	
+	# mov_chain_A should map to residues n_ref_B+1..end
+	mov_A_map = remap_chain_ca(mov_chain_A, offset=n_ref_B)
+	
+	# merge them
+	mov_ca = {**mov_B_map, **mov_A_map}
+
+
+    common_keys = sorted(
+        set(ref_ca.keys()).intersection(mov_ca.keys()),
+        key=lambda k: (k[0], k[1] or " ")
+    )
+
+    if len(common_keys) < 3:
+        raise ValueError(
+            f"Not enough matching CA positions to compute superposition ({len(common_keys)} found)"
+        )
+
+    fixed_atoms = [ref_ca[k] for k in common_keys]
+    moving_atoms = [mov_ca[k] for k in common_keys]
+    print("fixed atoms:", fixed_atoms)
+    print("moving atoms:", moving_atoms)
+    # Superimpose
+    sup = Superimposer()
+    sup.set_atoms(fixed_atoms, moving_atoms)
+    rotation, translation = sup.rotran
+
+    # Apply transform to ALL atoms
+    for atom in mov_struct.get_atoms():
+        atom.transform(rotation, translation)
+
+    # Export structure to a string
+    output = StringIO()
+    io = PDBIO()
+    io.set_structure(mov_struct)
+    io.save(output)
+
+    return output.getvalue()
 
 def relax_me(pdb_in, pdb_out, ligand_str, bb_pdb_str): #  apply relaxation, align, put back ligand
   #takes an input pdb write one after modification. 
