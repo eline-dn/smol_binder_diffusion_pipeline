@@ -63,13 +63,32 @@ N_iter=args.nstruct
 temperatures=args.temperature
 design_cutoffs=args.redesign_d_cutoff 
 
+"""
+Getting PyRosetta started
+"""
+extra_res_fa = ""
+
+NPROC = os.cpu_count()
+if "SLURM_CPUS_ON_NODE" in os.environ:
+    NPROC = os.environ["SLURM_CPUS_ON_NODE"]
+elif "OMP_NUM_THREADS" in os.environ:
+    NPROC = os.environ["OMP_NUM_THREADS"]
+
+
+DAB = f"{SCRIPT_PATH}/../utils/DAlphaBall.gcc" # This binary was compiled on UW systems. It may or may not work correctly on yours
+assert os.path.exists(DAB), "Please compile DAlphaBall.gcc and manually provide a path to it in this script under the variable `DAB`\n"\
+                        "For more info on DAlphaBall, visit: https://www.rosettacommons.org/docs/latest/scripting_documentation/RosettaScripts/Filters/HolesFilter"
+
+
+pyr.init(f"{extra_res_fa} -dalphaball {DAB} -beta_nov16 -run:preserve_header -mute all "
+         f"-multithreading true -multithreading:total_threads {NPROC} -multithreading:interaction_graph_threads {NPROC}")
 
 print("Setting up MPNN API")
 mpnnrunner = MPNNRunner(model_type="ligand_mpnn", ligand_mpnn_use_side_chain_context=True)  # starting with default checkpoint
 
 # running the relaxation +...
 pdb_name = os.path.basename(INPUT_PDB).replace(".pdb", "")
-relaxed_pdb_str=relax_me(INPUT_PDB, f"{pdb_name}relaxed.pdb")
+#relaxed_pdb_str=relax_me(INPUT_PDB, f"{pdb_name}relaxed.pdb")
 
 for design_cutoff in design_cutoffs:
     # 1 -  Which residues should or shouldn't be redesigned?
@@ -85,7 +104,7 @@ for design_cutoff in design_cutoffs:
     matched_residues = design_utils.get_matcher_residues(INPUT_PDB)
     
     _pose2 = pose.clone()
-    #pdbstr = pyrosetta.distributed.io.to_pdbstring(_pose2)
+    pdbstr = pyrosetta.distributed.io.to_pdbstring(_pose2)
     print("Identifying positions to redesign, i.e. in the pocket but not from the target")
     pocket_positions = setup_fixed_positions_around_target.get_pocket_positions(pose=_pose2, target_resno=ligand_resno, cutoff_CA=design_cutoff, cutoff_sc=6.0, return_as_list=True) 
     design_res=[]
@@ -113,7 +132,7 @@ for design_cutoff in design_cutoffs:
             #########################################################
             # Setting up MPNN runner 
             inp = mpnnrunner.MPNN_Input()
-            inp.pdb = relaxed_pdb_str
+            inp.pdb =  pdbstr # relaxed_pdb_str
             #inp.fixed_residues = fixed_residues
             inp.redesigned_residues=design_res
             inp.temperature = temperature
