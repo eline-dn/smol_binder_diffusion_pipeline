@@ -52,14 +52,14 @@ parser.add_argument("--pdb", required=True, type=str, help="Input PDB")
 #parser.add_argument("--align_atoms", nargs="+", type=str, help="Ligand atom names used for aligning the rotamers. Can also be proved with the scoring script.")
 parser.add_argument("--target_positions", nargs="+", type=int, help="Residue positions that belong to the target and should not be redesigned.")
 parser.add_argument("--redesign_d_cutoff", nargs="+", required=True, type=float, help ="distance cutoff for determining the pocket residues")
-parser.add_argument("--nstruct", type=int, default=5, help="How many design iterations? (how many output structures per binder)")
+#parser.add_argument("--nstruct", type=int, default=5, help="How many design iterations? (how many output structures per binder)")
 parser.add_argument("--temperature",nargs="+", type=float, default=0.2, help="temperature in lig MPNN")
 args = parser.parse_args()
 
 INPUT_PDB = args.pdb
 #scorefilename = "scorefile.txt"
 
-N_iter=args.nstruct
+#N_iter=args.nstruct
 temperatures=args.temperature
 design_cutoffs=args.redesign_d_cutoff 
 
@@ -126,26 +126,25 @@ for design_cutoff in design_cutoffs:
                 design_res.append(_pose2.pdb_info().chain(rn)+str(_pose2.pdb_info().number(rn))) 
 
     for temperature in temperatures:
-        for N in range(0,N_iter):
-            #########################################################
-            ### Running MPNN ####
-            #########################################################
-            # Setting up MPNN runner 
-            inp = mpnnrunner.MPNN_Input()
-            inp.pdb =  pdbstr # relaxed_pdb_str
-            #inp.fixed_residues = fixed_residues
-            inp.redesigned_residues=design_res
-            inp.temperature = temperature
-            inp.omit_AA = "CM"
-            inp.batch_size = 5
-            inp.number_of_batches = 1
-            print(f"Generating {inp.batch_size*inp.number_of_batches} initial guess sequences with ligandMPNN")
-            mpnn_out = mpnnrunner.run(inp)
-            with open("sequences.fasta", "a") as f:
-              for n, seq in enumerate(mpnn_out["generated_sequences"]):
-                output_name = f"{pdb_name}_lTp{temperature}_dcut{design_cutoff}_seq{n}"
-                f.write(f">{output_name}\n{seq}\n")
+      #########################################################
+      ### Running MPNN ####
+      #########################################################
+      # Setting up MPNN runner 
+      inp = mpnnrunner.MPNN_Input()
+      inp.pdb =  pdbstr # relaxed_pdb_str
+      #inp.fixed_residues = fixed_residues
+      inp.redesigned_residues=design_res
+      inp.temperature = temperature
+      inp.omit_AA = "CM"
+      inp.batch_size = 2
+      inp.number_of_batches = 1
+      print(f"Generating {inp.batch_size*inp.number_of_batches} initial guess sequences with ligandMPNN")
+      mpnn_out = mpnnrunner.run(inp)
+      with open("sequences.fasta", "a") as f:
+        for n, seq in enumerate(mpnn_out["generated_sequences"]):
+          output_name = f"{pdb_name}_lTp{temperature}_dcut{design_cutoff}_seq{n}"
+          f.write(f">{output_name}\n{seq}\n")
 
           
           
-print(f"Generated {N_iter} sequences for binder {pdb_name} ")#with temperature {"and".join(temperatures)}, and at redesign cutoffs {"and".join(args.redesign_d_cutoff)} ")
+print(f"Generated 3 sequences for binder {pdb_name} ")#with temperature {"and".join(temperatures)}, and at redesign cutoffs {"and".join(args.redesign_d_cutoff)} ")
