@@ -5,7 +5,7 @@ align the ligand back into the structure
 run lig MPNN without rosetta and scoring stuff on relaxed structure
 (saves fasta output)
 """
-
+from Bio.PDB.Polypeptide import is_aa
 import os, sys, glob
 import re
 import numpy as np
@@ -155,8 +155,8 @@ DESIGN_DIR_ligMPNNoutput= f"{WDIR}/3.1_design_pocket_ligandMPNN/alt/ligMPNN_outp
 DESIGN_DIR_ligMPNN_alt_relax= f"{WDIR}/3.1_design_pocket_ligandMPNN/alt/with_lig"
 os.makedirs(DESIGN_DIR_ligMPNNoutput, exist_ok=True)
 os.chdir(DESIGN_DIR_ligMPNNoutput)
-
-
+from Bio.PDB.StructureBuilder import StructureBuilder
+from Bio.PDB import PDBIO
 def switchnmerge_chains_with_structurebuilder(input_pdb):
     parser = PDBParser(QUIET=True)
     structure = parser.get_structure("x", input_pdb)
