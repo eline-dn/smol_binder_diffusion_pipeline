@@ -157,24 +157,130 @@ os.makedirs(DESIGN_DIR_ligMPNNoutput, exist_ok=True)
 os.chdir(DESIGN_DIR_ligMPNNoutput)
 
 
+def switchnmerge_chains_with_structurebuilder(input_pdb):
+    parser = PDBParser(QUIET=True)
+    structure = parser.get_structure("x", input_pdb)
+    model = structure[0]
+
+    if "A" not in model or "B" not in model:
+        raise ValueError("The PDB must contain both chain A and chain B")
+
+    chainA = model["A"]
+    chainB = model["B"]
+
+    # Initialize structure builder
+    sb = StructureBuilder()
+    sb.init_structure("merged")
+    sb.init_model(0)
+
+    # create one merged chain 'A'
+    sb.init_chain("A")
+
+    # --- IMPORTANT: init_seg sets self.segid used by init_residue internally ---
+    sb.init_seg("    ")  # 4-space segid, could be any 1-4 char string
+
+    residue_counter = 1
+
+    def add_chain(chain, residue_counter):
+        for res in chain:
+            if not is_aa(res, standard=False):
+                continue
+                #ligand=res
+            # res.id is (hetflag, resseq, icode)
+            hetflag, _, icode = res.id
+
+            # Use documented signature: init_residue(resname, field, resseq, icode)
+            sb.init_residue(res.get_resname(), hetflag, residue_counter, icode or " ")
+            residue_counter += 1
+
+            for atom in res:
+                # keep only primary altlocs
+                alt = atom.get_altloc()
+                if alt not in (" ", "A"):
+                    continue
+
+                # StructureBuilder.init_atom(name, coord, bfactor, occupancy,
+                #                            altloc, fullname, serial_number, element)
+                sb.init_atom(
+                    atom.get_name(),
+                    atom.get_coord(),
+                    atom.get_bfactor(),
+                    atom.get_occupancy(),
+                    atom.get_altloc() if atom.get_altloc() != " " else " ",
+                    atom.get_fullname(),
+                    None,              # let builder assign serial number
+                    atom.element
+                )
+        return residue_counter
+
+    # Append chain B then chain A
+    residue_counter = add_chain(chainB, residue_counter)
+    residue_counter = add_chain(chainA, residue_counter)
+
+
+     # =====================================================
+    # 2. Create ligand chain L  (non-AA residues)
+    # =====================================================
+    sb.init_chain("L")
+    sb.init_seg("    ")
+
+    ligand_counter = 1
+
+    for chain in model:
+        for res in chain:
+            if is_aa(res, standard=False):
+                continue  # only ligands, water, cofactors
+
+            hetflag, _, icode = res.id
+            sb.init_residue(res.get_resname(), hetflag, ligand_counter, icode or " ")
+            ligand_counter += 1
+
+            for atom in res:
+                alt = atom.get_altloc()
+                if alt not in (" ", "A"):
+                    continue
+                sb.init_atom(
+                    atom.get_name(),
+                    atom.get_coord(),
+                    atom.get_bfactor(),
+                    atom.get_occupancy(),
+                    alt if alt != " " else " ",
+                    atom.get_fullname(),
+                    None,
+                    atom.element
+                )
+
+
+    # Retrieve built structure and write to an in-memory buffer
+    new_structure = sb.get_structure()
+    io = PDBIO()
+    io.set_structure(new_structure)
+    output_pdb_path=input_pdb.replace(".pdb", "_fused.pdb")
+    io.save(output_pdb_path)
+    return output_pdb_path
+
+
 from Bio.PDB import PDBParser
+from io import StringIO
 parser = PDBParser(QUIET=True)
 commands_design = []
 cmds_filename_des = "commands_design"
 with open(cmds_filename_des, "w") as file:
     for pdb in glob.glob(f"{DESIGN_DIR_ligMPNN_alt_relax}/*.pdb"): ### 
-        structure = parser.get_structure("x", pdb) ### 
+        # fuse chain again to allow use of the pocket residue detecting  function:
+        fused_pdb=switchnmerge_chains_with_structurebuilder(pdb)
+        structure = parser.get_structure("x", fused_pdb) 
         model = structure[0]             
         chain = model["A"]               
         # count only standard residues
         residues = [res for res in chain.get_residues() if res.id[0] == " "] #need to have a list of ids with a chain id : A1, A2, ... 
-        target_reslist=list(map(str,range(1,len(residues)))) # all the res id that belong to chain A, i.e. to the target
+        target_reslist=list(map(str,range(len(residues)-256+1,len(residues))))# all the res id that belong to the target
         #print(pdb +f"native res from the target: {target_reslist[0]}-{target_reslist[-1]}")
         keep_nat=" ".join(target_reslist) # these belong to the target protein and should not be re-designed
         temperatures=" ".join(list(("0.2", "0.3")))
         distance_redesign_cutoffs = " ".join(list(("8.0", "15.0", "500.0")))
         commands_design.append(f"{PYTHON['ligandMPNN']} {SCRIPT_DIR}/scripts/design/simple_redesign.py " ### change name of the scipt and the pdbs!!!!
-                         f"--pdb {pdb} --nstruct {NSTRUCT} --redesign_d_cutoff {distance_redesign_cutoffs} --target_positions {keep_nat}"
+                         f"--pdb {fused_pdb} --redesign_d_cutoff {distance_redesign_cutoffs} --target_positions {keep_nat}"
                          f" --temperature {temperatures} \n" )
         file.write(commands_design[-1])
 
@@ -193,8 +299,8 @@ utils.create_slurm_submit_script(filename=submit_script, name="3.1_design_pocket
 
 """utils.create_slurm_submit_script(filename=submit_script, name="2_af2", mem="6g",
                                       N_cores=2, gpu=True, partition="h100", time="30:00:00", email=EMAIL, array=len(commands_af2),
-                                      array_commandfile=cmds_filename_af2, group=25)"""
+                                      array_commandfile=cmds_filename_af2, group=25)
 
 p = subprocess.Popen(['sbatch', submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-(output, err) = p.communicate()
+(output, err) = p.communicate()"""
 
