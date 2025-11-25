@@ -50,7 +50,7 @@ parser.add_argument("--pdb", required=True, type=str, help="Input PDB")
 #parser.add_argument("--scoring", type=str, required=True, help="Path to a script that implement scoring methods for a particular design job.\n" # use for example scripts/design/scoring/FUN_scoring.py
                     #"Script must implement methods score_design(pose, sfx, catres) and filter_scores(scores), and a dictionary `filters` with filtering criteria.")
 #parser.add_argument("--align_atoms", nargs="+", type=str, help="Ligand atom names used for aligning the rotamers. Can also be proved with the scoring script.")
-parser.add_argument("--target_positions", nargs="+", type=int, help="Residue positions that belong to the target and should not be redesigned.")
+parser.add_argument("--target_positions", nargs="+", type=str, help="Residue positions that belong to the target and should not be redesigned.")
 parser.add_argument("--redesign_d_cutoff", nargs="+", required=True, type=float, help ="distance cutoff for determining the pocket residues")
 #parser.add_argument("--nstruct", type=int, default=5, help="How many design iterations? (how many output structures per binder)")
 parser.add_argument("--temperature",nargs="+", type=float, default=0.2, help="temperature in lig MPNN")
@@ -108,7 +108,7 @@ for design_cutoff in design_cutoffs:
     print("Identifying positions to redesign, i.e. in the pocket but not from the target")
     pocket_positions = setup_fixed_positions_around_target.get_pocket_positions(pose=_pose2, target_resno=ligand_resno, cutoff_CA=design_cutoff, cutoff_sc=6.0, return_as_list=True) 
     design_res=[]
-    target_positions = {int(x) for x in args.target_positions}
+    target_positions = {str(x) for x in args.target_positions}
     design_list = [
         res.seqpos()
         for res in _pose2.residues
