@@ -48,11 +48,13 @@ AF3_DIR = f"{WDIR}/4_af3"
 DESIGN_DIR_ligMPNNoutput= f"{WDIR}/3.1_design_pocket_ligandMPNN/alt/ligMPNN_output"
 os.chdir(DESIGN_DIR_ligMPNNoutput)
 
+"""---------- co folding with af 3---------"""
+
 ### prep the json input files
 import json
 
 # path to your input JSON
-input_path = f"{AF3_DIR}/input/test_1Z9Y_FUN_no_msa_template.json" # template generic json file to use as input for af3
+input_path = f"{AF3_DIR}/input2/test_1Z9Y_FUN_no_msa_template.json" # template generic json file to use as input for af3
 
 
 # load JSON
@@ -73,13 +75,13 @@ for id, seq in mpnn_fasta.items():
     count=0
     slot+=1
   str_slot=str(slot)
-  json_dir=f"{AF3_DIR}/input/{str_slot}"
+  json_dir=f"{AF3_DIR}/input2/{str_slot}"
   if not os.path.exists(json_dir):
     os.makedirs(json_dir, exist_ok=True)
-  if "seq1" in id:
-    continue # keep only seq0 right now and see if we already have binders
+  if "seq0" in id:
+    continue # keep only seq0 right now and see if we already have binders # changed later to keep only seq 1 and repredict the rest
   id_clean=id.replace(">","")
-  id_clean=id_clean.replace("_seq0\n","")
+  id_clean=id_clean.replace("_seq1\n","")
   id_clean=id_clean.replace("model2_w_ligand_fused_","")
   seq_clean=seq.replace("\n","")
   seq_clean=seq_clean[:-256]
@@ -99,5 +101,21 @@ for id, seq in mpnn_fasta.items():
 
 
 """
+sbatch /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/af3/run_alphafold.sh -i input2/1 -o output2 --no-msa
+sbatch /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/af3/run_alphafold.sh -i input2/2 -o output2 --no-msa
+sbatch /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/af3/run_alphafold.sh -i input2/3 -o output2 --no-msa
+sbatch /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/af3/run_alphafold.sh -i input2/4 -o output2 --no-msa
+
+
 sbatch run_alphafold.sh -i /work/lpdi/users/dobbelst/tools/alphafold3_examples/af_input/fold_input_singleseq.json -o <OUTPUT_DIR> --no-msa
 """
+
+#### process & filter output
+# in  /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/4_af3/output
+"""
+filtering strategy: good iptm and plddt, + low rmsd to original RF diffusion backbone
+then repredicted complex without ligand , keep low iptm and plddt +  high rmsd to RF diff backbone
+"""
+AF3_struct= f"{AF3_DIR}/output"
+
+model= f"{AF3_DIR}/output/binder_name/binder_name.cif
