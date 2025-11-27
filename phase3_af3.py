@@ -116,6 +116,31 @@ sbatch run_alphafold.sh -i /work/lpdi/users/dobbelst/tools/alphafold3_examples/a
 filtering strategy: good iptm and plddt, + low rmsd to original RF diffusion backbone
 then repredicted complex without ligand , keep low iptm and plddt +  high rmsd to RF diff backbone
 """
+import json
 AF3_struct= f"{AF3_DIR}/output"
+for confidence in glob.glob(f"{AF3_struct}/*/*_summary_confidences.json"):
+    design_name=os.path.basename(confidence)
+    design_name=design_name.replace("_summary_confidences", "") # e.g. t2_2_7_4_t0.3_ltp0.2_dcut500.0
+    #load JSON
+    with open(confidence, "r") as f:
+        data = json.load(f) # data["chain_iptm", "chain_pair_iptm", "chain_pair_pae_min","chain_ptm","fraction_disordered": 0.0, "has_clash": 0.0, "iptm": 0.7, "ptm": 0.75, "ranking_score": 0.71]
+    data["id"]=f"{design_name}_seq0"
+    # compute aligned rmsd to original rf diffusion bb:
+    # retrieve bb: format t2_1_100_1_T0.3.pdb in MPNN_DIR
+    bb_name= design_name.replace("_ltp0.[1-9]_dcut[8.0]|[15.0]|[500.0]", ".pdb")
+    bb_name= design_name.replace("t0","T0")
+    bb_pdb=f"{MPNN_DIR}/backbones/{bb_name}"
+    # load / convert (?) model mmcif
+    design_cif=confidence.replace("_summary_confidences","_model.cif")
+    
+    # align
+
+    # add metrics to csv file
+    df = pd.DataFrame([data])
+    df.to_csv(f"{AF3_struct}/design_confidences.csv", mode="a", index=False, header=not pd.io.common.file_exists(f"{AF3_struct}/design_confidences.csv"))
+    
+
+    
+
 
 model= f"{AF3_DIR}/output/binder_name/binder_name.cif
