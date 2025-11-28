@@ -164,6 +164,7 @@ mmcif_parser=MMCIFParser(QUIET= True)
 ref_struct = pdb_parser.get_structure("ref", bb_pdb)
 mov_struct = mmcif_parser.get_structure("mov", design_cif)
 
+"""
 # before alignment, split binder and target in pMPNN outputs :
 #create new structure  with structure builder:
 # original chain A
@@ -200,39 +201,104 @@ new_model.add(chain_A)
 new_model.add(chainB) # put back ligand
 new_struct.add(new_model)
 
-        
+""" 
 # in ref: chain A is target, chB is ligand, chC is binder
 # in mov: chain A is target, chB is binder, FUN is ligand
 # align chain A to chain A and compute  binder rmsd to original binding site + QC for target rmsd to reference target
 # Use first model (index 0) for both
  # Extract chain A from trajectory_pdb
-    chain_trajectory = ref_struct[0]['A']
+from Bio.PDB.PDBParser import PDBParser
+from Bio.SVDSuperimposer import SVDSuperimposer
 
-    # Extract the specified chains from starting_pdb
-    #chain_ids = chain_ids_string.split(',')
-    residues_starting = []
-    chain= new_struct[0]['A']
-    for residue in chain:
-        if is_aa(residue, standard=True):
-            residues_starting.append(residue)
-       
-    # Extract residues from chain A in trajectory_pdb
-    residues_trajectory = [residue for residue in chain_trajectory if is_aa(residue, standard=True)]
 
-    # Ensure that both structures have the same number of residues
-    min_length = min(len(residues_starting), len(residues_trajectory))
-    residues_starting = residues_starting[:min_length]
-    residues_trajectory = residues_trajectory[:min_length]
+three_to_one = {
+    'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
+    'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
+    'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R',
+    'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'
+}
+import numpy as np
 
-    # Collect CA atoms from the two sets of residues
-    atoms_starting = [residue['CA'] for residue in residues_starting if 'CA' in residue]
-    atoms_trajectory = [residue['CA'] for residue in residues_trajectory if 'CA' in residue]
+native=ref_struct
+model= mov_struct
 
-    # Calculate RMSD using structural alignment
-    sup = Superimposer()
-    sup.set_atoms(atoms_starting, atoms_trajectory)
-    rmsd = round(sup.rms, 2)
+AA = ["ALA", "CYS", "ASP", "GLU", "PHE", "GLY", "HIS", "ILE", "LYS", "LEU", "MET", "ASN", "PRO", "GLN",
+      "ARG", "SER", "THR", "VAL", "TRP", "TYR"]
 
+def rmsd(native_coords, model_coords, rot, tran):
+    model_coords_rotated = np.dot(model_coords, rot) + tran
+    diff = native_coords - model_coords_rotated
+    RMSD = np.sqrt(sum(sum(diff**2))/native_coords.shape[0])
+    return RMSD
+
+def specific_align(native, model, 
+          aln_atoms = 1,
+        #aln_cutoff # index of the residue
+          atom_types = ["CA"]) -> list:
+    
+    # A long one-liner that gets the one-letter amino acid representation for each residue in a structure,
+    # then joins those letters into one long string.
+    native_seq = "".join([ three_to_one[r.resname] for r in native[0].get_residues() if r.resname in AA ])
+    model_seq = "".join([ three_to_one[r.resname] for r in model[0].get_residues() if r.resname in AA ])
+    
+    assert len(model_seq) == len(native_seq), "The sequences should be of identical length."
+    
+    # Get the atoms that we want to align
+    native_coords = [ a.coord for a in native[0].get_atoms() if a.parent.resname in AA and a.name in atom_types ]
+    model_coords = [ a.coord for a in model[0].get_atoms() if a.parent.resname in AA and a.name in atom_types ]
+
+    # Convert to numpy arrays
+    native_coords = np.array(native_coords)
+    model_coords = np.array(model_coords)
+    
+    # Use a specific percentage of atoms to align.
+    percentage_to_aln = int(aln_atoms * len(native_coords))
+    
+    si = SVDSuperimposer()
+    si.set(native_coords[:percentage_to_aln], model_coords[:percentage_to_aln])
+    si.run()
+    
+    # The SVD superimposer above gives us the rotation and translation matrices
+    # that we can use to "transform" the model coordinates. The rotation and translation
+    # matrices were based on aligning 50% of the backbone atoms. I will explain this a bit more later.
+    RMSD = rmsd(native_coords, model_coords, si.rot, si.tran)
+    
+    return [si, RMSD]
+    
+si_specific, rmsd_bb = specific_align(native, model)
+print("The initial RMSD is {:.2f}, with a 50% aligned backbone RMSD of {:.2f} and a full backbone RMSD of {:.2f}".format(
+    si_specific.get_init_rms(), si_specific.get_rms(), rmsd_bb))
+
+
+
+"""
+chain_trajectory = ref_struct[0]['A']
+
+# Extract the specified chains from starting_pdb
+#chain_ids = chain_ids_string.split(',')
+residues_starting = []
+chain= new_struct[0]['A']
+for residue in chain:
+    if is_aa(residue, standard=True):
+        residues_starting.append(residue)
+   
+# Extract residues from chain A in trajectory_pdb
+residues_trajectory = [residue for residue in chain_trajectory if is_aa(residue, standard=True)]
+
+# Ensure that both structures have the same number of residues
+min_length = min(len(residues_starting), len(residues_trajectory))
+residues_starting = residues_starting[:min_length]
+residues_trajectory = residues_trajectory[:min_length]
+
+# Collect CA atoms from the two sets of residues
+atoms_starting = [residue['CA'] for residue in residues_starting if 'CA' in residue]
+atoms_trajectory = [residue['CA'] for residue in residues_trajectory if 'CA' in residue]
+
+# Calculate RMSD using structural alignment
+sup = Superimposer()
+sup.set_atoms(atoms_starting, atoms_trajectory)
+target_rmsd = round(sup.rms, 2)
+"""
 
 
 """
