@@ -164,6 +164,131 @@ mmcif_parser=MMCIFParser(QUIET= True)
 ref_struct = pdb_parser.get_structure("ref", bb_pdb)
 mov_struct = mmcif_parser.get_structure("mov", design_cif)
 
+
+ref_model = ref_struct[0]
+mov_model = mov_struct[0]
+
+from Bio.PDB import PDBParser, MMCIFParser, Superimposer, StructureBuilder
+from Bio.PDB.Polypeptide import is_aa
+# -------------------------------------------------------------
+# 2) Split reference: chain A = fused binder+target
+#    We assume binder comes first and target comes after.
+#    User must provide binder_length (or compute from sequence).
+# -------------------------------------------------------------
+def split_fused_chain(ref_model, fused_chain_id, binder_len):
+    fused = ref_model[fused_chain_id]
+
+    # new chains
+    builder = StructureBuilder.StructureBuilder()
+    builder.init_structure("split")
+    builder.init_model(0)
+    builder.init_chain("C")   # binder
+    builder.init_chain("A")   # target
+
+    residues = [res for res in fused if is_aa(res, standard=True)]
+
+    for i, res in enumerate(residues):
+        new_res = res.copy()
+        if i < binder_len:
+            builder.structure[0]["C"].add(new_res)
+        else:
+            builder.structure[0]["A"].add(new_res)
+
+    # also copy ligand (chain B)
+    if "B" in ref_model:
+        builder.structure[0].add(ref_model["B"].copy())
+
+    return builder.get_structure()
+
+
+# You must provide binder length (known from your pipeline = 256)
+binder_length = 256
+ref_split = split_fused_chain(ref_model, "A", binder_length)
+
+ref_target = ref_split[0]["A"]
+ref_binder = ref_split[0]["C"]
+ref_ligand = ref_split[0]["B"]
+
+mov_target = mov_model["A"]
+mov_binder = mov_model["B"]
+mov_ligand = mov_model["FUN"]
+
+
+# -------------------------------------------------------------
+# 3) Helper: get ordered CA coordinate lists based on sequence
+# -------------------------------------------------------------
+def get_ca_atoms(chain):
+    atoms = []
+    for res in chain:
+        if is_aa(res, standard=True) and "CA" in res:
+            atoms.append(res["CA"])
+    return atoms
+
+
+# -------------------------------------------------------------
+# 4) Align targets based on CA atoms
+# -------------------------------------------------------------
+ref_ca = get_ca_atoms(ref_target)
+mov_ca = get_ca_atoms(mov_target)
+
+# ensure same length by trimming the longer one (safer than trusting numbering)
+L = min(len(ref_ca), len(mov_ca))
+ref_ca = ref_ca[:L]
+mov_ca = mov_ca[:L]
+
+sup = Superimposer()
+sup.set_atoms(ref_ca, mov_ca)
+rot, tran = sup.rotran
+target_rmsd = sup.rms
+
+
+# -------------------------------------------------------------
+# 5) Apply transform to ALL atoms in the moving structure
+# -------------------------------------------------------------
+for atom in mov_struct.get_atoms():
+    atom.transform(rot, tran)
+
+mov_model = mov_struct[0]
+ref_target = ref_split[0]["A"]
+ref_binder = ref_split[0]["C"]
+ref_ligand = ref_split[0]["B"]
+
+mov_target = mov_model["A"]
+mov_binder = mov_model["B"]
+mov_ligand = mov_model["FUN"]
+# -------------------------------------------------------------
+# 6) Compute unaligned binder and ligand RMSDs
+# -------------------------------------------------------------
+def rmsd(a, b):
+    dif = a - b
+    return float(np.sqrt((dif * dif).sum(axis=1).mean()))
+
+
+ref_binder_ca = get_ca_coords(ref_binder)
+mov_binder_ca = get_ca_coords(mov_binder)
+L = min(len(ref_binder_ca), len(mov_binder_ca))
+binder_rmsd = rmsd(ref_binder_ca[:L], mov_binder_ca[:L])
+
+# ligand atoms: compute RMSD over all heavy atoms
+ref_lig_atoms = np.array([a.get_coord() for a in ref_ligand.get_atoms()])
+mov_lig_atoms = np.array([a.get_coord() for a in mov_ligand.get_atoms()])
+L = min(len(ref_lig_atoms), len(mov_lig_atoms))
+lig_rmsd = rmsd(ref_lig_atoms[:L], mov_lig_atoms[:L])
+
+
+# -------------------------------------------------------------
+# 7) Output
+# -------------------------------------------------------------
+print("Aligned target RMSD :", round(target_rmsd, 3))
+print("Binder RMSD (no align):", round(binder_rmsd, 3))
+print("Ligand RMSD (no align):", round(lig_rmsd, 3))
+
+"""result:
+Aligned target RMSD : 18.577
+Binder RMSD (no align): 57.768
+Ligand RMSD (no align): 10.902
+"""
+
 """
 # before alignment, split binder and target in pMPNN outputs :
 #create new structure  with structure builder:
@@ -207,6 +332,7 @@ new_struct.add(new_model)
 # align chain A to chain A and compute  binder rmsd to original binding site + QC for target rmsd to reference target
 # Use first model (index 0) for both
  # Extract chain A from trajectory_pdb
+"""
 from Bio.PDB.PDBParser import PDBParser
 from Bio.SVDSuperimposer import SVDSuperimposer
 
@@ -269,7 +395,7 @@ si_specific, rmsd_bb = specific_align(native, model)
 print("The initial RMSD is {:.2f}, with a 50% aligned backbone RMSD of {:.2f} and a full backbone RMSD of {:.2f}".format(
     si_specific.get_init_rms(), si_specific.get_rms(), rmsd_bb))
 
-
+"""
 
 """
 chain_trajectory = ref_struct[0]['A']
