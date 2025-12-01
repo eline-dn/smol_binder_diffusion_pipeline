@@ -118,397 +118,188 @@ filtering strategy: good iptm and plddt, + low rmsd to original RF diffusion bac
 """
 import json
 import re
-from Bio.PDB import PDBParser, MMCIFParser, Superimposer, DSSP, Selection, Polypeptide, PDBIO, Select, Chain
+from Bio.PDB import PDBParser, MMCIFParser, Superimposer, DSSP, Selection, Polypeptide, PDBIO, Select, Chain, PDBIO
 from Bio.PDB.Polypeptide import is_aa
 
 AF3_struct= f"{AF3_DIR}/output"
 for confidence in glob.glob(f"{AF3_struct}/*/*_summary_confidences.json"):
     print("condidence:", confidence)
 
-
-design_name=os.path.basename(confidence)
-design_name=design_name.replace("_summary_confidences", "") # e.g. t2_2_7_4_t0.3_ltp0.2_dcut500.0
-#load JSON
-with open(confidence, "r") as f:
-    data = json.load(f) # data["chain_iptm", "chain_pair_iptm", "chain_pair_pae_min","chain_ptm","fraction_disordered": 0.0, "has_clash": 0.0, "iptm": 0.7, "ptm": 0.75, "ranking_score": 0.71]
-data["id"]=f"{design_name}_seq0"
-# also get atoms plddts from ..._confidences.json:
-conf=confidence.replace("_summary", "")
-with open(conf,"r") as f:
-    conf=json.load(f)
-data["atom_plddt"]=conf["atom_plddts"]
-data["atom_chain_ids"]=conf["atom_chain_ids"]
-data["chain_plddt"]={}
-chain_atom_len={}
-for i,chain_id in enumerate(data["atom_chain_ids"]):
-    if chain_id not in data["chain_plddt"].keys():
-        data["chain_plddt"][chain_id]=0
-    data["chain_plddt"][chain_id]+=data["atom_plddt"][i]
-    if chain_id not in chain_atom_len.keys():
-        chain_atom_len[chain_id]=0
-    chain_atom_len[chain_id]+=1
-for chain, plddt in data["chain_plddt"].items():
-    data["chain_plddt"][chain]=plddt/chain_atom_len[chain] # = mean atom plddt per chain
-
-# compute aligned rmsd to original rf diffusion bb:
-# retrieve bb: format t2_1_100_1_T0.3.pdb in MPNN_DIR
-bb_name = re.sub(r"_ltp0\.[1-9]_dcut(8\.0|15\.0|500\.0).json", ".pdb", design_name)
-bb_name= bb_name.replace("t0","T0")
-bb_pdb=f"{MPNN_DIR}/backbones/{bb_name}"
-print("bb:", bb_pdb)
-# load / convert (?) model mmcif
-design_cif=confidence.replace("_summary_confidences.json","_model.cif")
-print("design_cif:", design_cif)
-pdb_parser = PDBParser(QUIET=True)
-mmcif_parser=MMCIFParser(QUIET= True)
-ref_struct = pdb_parser.get_structure("ref", bb_pdb)
-mov_struct = mmcif_parser.get_structure("mov", design_cif)
-
-
-ref_model = ref_struct[0]
-mov_model = mov_struct[0]
-
-from Bio.PDB import PDBParser, MMCIFParser, Superimposer, StructureBuilder
-from Bio.PDB.Polypeptide import is_aa
-# -------------------------------------------------------------
-# 2) Split reference: chain A = fused binder+target
-#    We assume binder comes first and target comes after.
-#    User must provide binder_length (or compute from sequence).
-# -------------------------------------------------------------
-def split_fused_chain(ref_model, fused_chain_id, binder_len):
-    fused = ref_model[fused_chain_id]
-
-    # new chains
-    builder = StructureBuilder.StructureBuilder()
-    builder.init_structure("split")
-    builder.init_model(0)
-    builder.init_chain("C")   # binder
-    builder.init_chain("A")   # target
-
-    residues = [res for res in fused if is_aa(res, standard=True)]
-
-    for i, res in enumerate(residues):
-        new_res = res.copy()
-        if i < binder_len:
-            builder.structure[0]["C"].add(new_res)
-        else:
-            builder.structure[0]["A"].add(new_res)
-
-    # also copy ligand (chain B)
-    if "B" in ref_model:
-        builder.structure[0].add(ref_model["B"].copy())
-
-    return builder.get_structure()
-
-
-# You must provide binder length (known from your pipeline = 256)
-binder_length = 256
-ref_split = split_fused_chain(ref_model, "A", binder_length)
-
-ref_target = ref_split[0]["A"]
-ref_binder = ref_split[0]["C"]
-ref_ligand = ref_split[0]["B"]
-
-mov_target = mov_model["A"]
-mov_binder = mov_model["B"]
-mov_ligand = mov_model["FUN"]
-
-
-# -------------------------------------------------------------
-# 3) Helper: get ordered CA coordinate lists based on sequence
-# -------------------------------------------------------------
-def get_ca_atoms(chain):
-    atoms = []
-    for res in chain:
-        if is_aa(res, standard=True) and "CA" in res:
-            atoms.append(res["CA"])
-    return atoms
-
-
-# -------------------------------------------------------------
-# 4) Align targets based on CA atoms
-# -------------------------------------------------------------
-ref_ca = get_ca_atoms(ref_target)
-mov_ca = get_ca_atoms(mov_target)
-
-# ensure same length by trimming the longer one (safer than trusting numbering)
-L = min(len(ref_ca), len(mov_ca))
-ref_ca = ref_ca[:L]
-mov_ca = mov_ca[:L]
-
-sup = Superimposer()
-sup.set_atoms(ref_ca, mov_ca)
-rot, tran = sup.rotran
-target_rmsd = sup.rms
-
-
-# -------------------------------------------------------------
-# 5) Apply transform to ALL atoms in the moving structure
-# -------------------------------------------------------------
-for atom in mov_struct.get_atoms():
-    atom.transform(rot, tran)
-
-mov_model = mov_struct[0]
-ref_target = ref_split[0]["A"]
-ref_binder = ref_split[0]["C"]
-ref_ligand = ref_split[0]["B"]
-
-mov_target = mov_model["A"]
-mov_binder = mov_model["B"]
-mov_ligand = mov_model["FUN"]
-# -------------------------------------------------------------
-# 6) Compute unaligned binder and ligand RMSDs
-# -------------------------------------------------------------
-def rmsd(a, b):
-    dif = a - b
-    return float(np.sqrt((dif * dif).sum(axis=1).mean()))
-
-
-ref_binder_ca = get_ca_coords(ref_binder)
-mov_binder_ca = get_ca_coords(mov_binder)
-L = min(len(ref_binder_ca), len(mov_binder_ca))
-binder_rmsd = rmsd(ref_binder_ca[:L], mov_binder_ca[:L])
-
-# ligand atoms: compute RMSD over all heavy atoms
-ref_lig_atoms = np.array([a.get_coord() for a in ref_ligand.get_atoms()])
-mov_lig_atoms = np.array([a.get_coord() for a in mov_ligand.get_atoms()])
-L = min(len(ref_lig_atoms), len(mov_lig_atoms))
-lig_rmsd = rmsd(ref_lig_atoms[:L], mov_lig_atoms[:L])
-
-
-# -------------------------------------------------------------
-# 7) Output
-# -------------------------------------------------------------
-print("Aligned target RMSD :", round(target_rmsd, 3))
-print("Binder RMSD (no align):", round(binder_rmsd, 3))
-print("Ligand RMSD (no align):", round(lig_rmsd, 3))
-
-"""result:
-Aligned target RMSD : 18.577
-Binder RMSD (no align): 57.768
-Ligand RMSD (no align): 10.902
-"""
-
-"""
-# before alignment, split binder and target in pMPNN outputs :
-#create new structure  with structure builder:
-# original chain A
-model = ref_struct[0]
-chainA = model["A"]
-chainB=model["B"]
-residues = [res for res in chainA if is_aa(res, standard=False)]
-N = len(residues)
-print("residues:", residues)
-cutoff_index = N - 256
-
-# ------ Create new structure with a new Model ------
-from Bio.PDB.Structure import Structure
-from Bio.PDB.Model import Model
-from Bio.PDB.Chain import Chain
-
-new_struct = Structure("split")
-new_model = Model(0)
-
-chain_C = Chain("C")
-chain_A = Chain("A")
-
-# ------ Fill chains directly with residue objects ------
-for i, res in enumerate(residues):
-    if i < cutoff_index:
-        chain_C.add(res.copy())   # copy to avoid pointer alias
-        print("chainC:", res.get_id())
-    else:
-        chain_A.add(res.copy())
-        print("chainA:", res.get_id())
-
-new_model.add(chain_C)
-new_model.add(chain_A)
-new_model.add(chainB) # put back ligand
-new_struct.add(new_model)
-
-""" 
-# in ref: chain A is target, chB is ligand, chC is binder
-# in mov: chain A is target, chB is binder, FUN is ligand
-# align chain A to chain A and compute  binder rmsd to original binding site + QC for target rmsd to reference target
-# Use first model (index 0) for both
- # Extract chain A from trajectory_pdb
-"""
-from Bio.PDB.PDBParser import PDBParser
-from Bio.SVDSuperimposer import SVDSuperimposer
-
-
-three_to_one = {
-    'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
-    'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
-    'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R',
-    'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'
-}
-import numpy as np
-
-native=ref_struct
-model= mov_struct
-
-AA = ["ALA", "CYS", "ASP", "GLU", "PHE", "GLY", "HIS", "ILE", "LYS", "LEU", "MET", "ASN", "PRO", "GLN",
-      "ARG", "SER", "THR", "VAL", "TRP", "TYR"]
-
-def rmsd(native_coords, model_coords, rot, tran):
-    model_coords_rotated = np.dot(model_coords, rot) + tran
-    diff = native_coords - model_coords_rotated
-    RMSD = np.sqrt(sum(sum(diff**2))/native_coords.shape[0])
-    return RMSD
-
-def specific_align(native, model, 
-          aln_atoms = 1,
-        #aln_cutoff # index of the residue
-          atom_types = ["CA"]) -> list:
     
-    # A long one-liner that gets the one-letter amino acid representation for each residue in a structure,
-    # then joins those letters into one long string.
-    native_seq = "".join([ three_to_one[r.resname] for r in native[0].get_residues() if r.resname in AA ])
-    model_seq = "".join([ three_to_one[r.resname] for r in model[0].get_residues() if r.resname in AA ])
+    design_name=os.path.basename(confidence)
+    design_name=design_name.replace("_summary_confidences", "") # e.g. t2_2_7_4_t0.3_ltp0.2_dcut500.0
+    design_name=design_name.replace(".json", "")
+    #load JSON
+    with open(confidence, "r") as f:
+        data = json.load(f) # data["chain_iptm", "chain_pair_iptm", "chain_pair_pae_min","chain_ptm","fraction_disordered": 0.0, "has_clash": 0.0, "iptm": 0.7, "ptm": 0.75, "ranking_score": 0.71]
+    data["id"]=f"{design_name}_seq0"
+    # also get atoms plddts from ..._confidences.json:
+    conf=confidence.replace("_summary", "")
+    with open(conf,"r") as f:
+        conf=json.load(f)
+    data["atom_plddt"]=conf["atom_plddts"]
+    data["atom_chain_ids"]=conf["atom_chain_ids"]
+    data["chain_plddt"]={}
+    chain_atom_len={}
+    for i,chain_id in enumerate(data["atom_chain_ids"]):
+        if chain_id not in data["chain_plddt"].keys():
+            data["chain_plddt"][chain_id]=0
+        data["chain_plddt"][chain_id]+=data["atom_plddt"][i]
+        if chain_id not in chain_atom_len.keys():
+            chain_atom_len[chain_id]=0
+        chain_atom_len[chain_id]+=1
+    for chain, plddt in data["chain_plddt"].items():
+        data["chain_plddt"][chain]=plddt/chain_atom_len[chain] # = mean atom plddt per chain
     
-    assert len(model_seq) == len(native_seq), "The sequences should be of identical length."
+    # compute aligned rmsd to original rf diffusion bb:
+    # retrieve bb: format t2_1_100_1_T0.3.pdb in MPNN_DIR
+    bb_name = re.sub(r"_ltp0\.[1-9]_dcut(8\.0|15\.0|500\.0)", ".pdb", design_name)
+    bb_name= bb_name.replace("t0","T0")
+    bb_pdb=f"{MPNN_DIR}/backbones/{bb_name}"
+    print("bb:", bb_pdb)
+    # load / convert (?) model mmcif
+    design_cif=confidence.replace("_summary_confidences.json","_model.cif")
+    print("design_cif:", design_cif)
+    pdb_parser = PDBParser(QUIET=True)
+    mmcif_parser=MMCIFParser(QUIET= True)
+    ref_struct = pdb_parser.get_structure("ref", bb_pdb)
+    mov_struct = mmcif_parser.get_structure("mov", design_cif)
+    print(bb_pdb)
+    print(design_cif)
     
-    # Get the atoms that we want to align
-    native_coords = [ a.coord for a in native[0].get_atoms() if a.parent.resname in AA and a.name in atom_types ]
-    model_coords = [ a.coord for a in model[0].get_atoms() if a.parent.resname in AA and a.name in atom_types ]
-
-    # Convert to numpy arrays
-    native_coords = np.array(native_coords)
-    model_coords = np.array(model_coords)
+    ref_model = ref_struct[0]
+    mov_model = mov_struct[0]
     
-    # Use a specific percentage of atoms to align.
-    percentage_to_aln = int(aln_atoms * len(native_coords))
+    from Bio.PDB import PDBParser, MMCIFParser, Superimposer, StructureBuilder
+    from Bio.PDB.Polypeptide import is_aa
+    # -------------------------------------------------------------
+    # 2) Split reference: chain A = fused binder+target
+    #    We assume binder comes first and target comes after.
+    #    User must provide binder_length (or compute from sequence).
+    # -------------------------------------------------------------
+    def split_fused_chain(ref_model, fused_chain_id, binder_len):
+        fused = ref_model[fused_chain_id]
     
-    si = SVDSuperimposer()
-    si.set(native_coords[:percentage_to_aln], model_coords[:percentage_to_aln])
-    si.run()
+        # new chains
+        builder = StructureBuilder.StructureBuilder()
+        builder.init_structure("split")
+        builder.init_model(0)
+        builder.init_chain("C")   # binder
+        builder.init_chain("A")   # target
     
-    # The SVD superimposer above gives us the rotation and translation matrices
-    # that we can use to "transform" the model coordinates. The rotation and translation
-    # matrices were based on aligning 50% of the backbone atoms. I will explain this a bit more later.
-    RMSD = rmsd(native_coords, model_coords, si.rot, si.tran)
+        residues = [res for res in fused if is_aa(res, standard=True)]
+        #print(residues)
+        complex_len=len(residues)
+        print("complex_len:", complex_len)
+        for i, res in enumerate(residues):
+            new_res = res.copy()
+            if i < complex_len-binder_len:
+                builder.structure[0]["C"].add(new_res)
+            else:
+                builder.structure[0]["A"].add(new_res)
     
-    return [si, RMSD]
+        # also copy ligand (chain B)
+        if "B" in ref_model:
+            builder.init_chain("F")
+            for res in ref_model["B"]:
+                new_res = res.copy()
+                builder.structure[0]["F"].add(new_res)
+        """
+        for atom in builder.structure[0]["C"].get_atoms():
+            print(atom.get_full_id())
+        """
+        return builder.get_structure()
     
-si_specific, rmsd_bb = specific_align(native, model)
-print("The initial RMSD is {:.2f}, with a 50% aligned backbone RMSD of {:.2f} and a full backbone RMSD of {:.2f}".format(
-    si_specific.get_init_rms(), si_specific.get_rms(), rmsd_bb))
+    
+    # You must provide binder length (known from your pipeline = 256)
+    binder_length = 256
+    ref_split = split_fused_chain(ref_model, "A", binder_length)
+    """
+    io = PDBIO()
+    io.set_structure(ref_split)
+    io.save(f"out_test_{bb_name}.pdb")
+    """
+    ref_target = ref_split[0]["A"]
+    ref_binder = ref_split[0]["C"]
+    ref_ligand = ref_split[0]["F"]
+    
+    mov_target = mov_model["A"]
+    mov_binder = mov_model["B"]
+    mov_ligand = mov_model["FUN"]
+    
+    
 
-"""
+    # -------------------------------------------------------------
+    # 3) Helper: get ordered CA coordinate lists based on sequence
+    # -------------------------------------------------------------
+    def get_ca_atoms(chain):
+        atoms = []
+        for res in chain:
+            if is_aa(res, standard=True) and "CA" in res:
+                atoms.append(res["CA"])
+        return atoms
+    
+    def get_ca_coords(chain):
+        coords = []
+        for res in chain:
+            if is_aa(res, standard=True) and "CA" in res:
+                coords.append(res["CA"].get_coord())
+        return np.array(coords)
+    # compute full rmsd with full alignment :
+    
+    ref_ca = get_ca_atoms(ref_target) + get_ca_atoms(ref_binder)
+    mov_ca = get_ca_atoms(mov_target) +get_ca_atoms(mov_binder)
+    
+    # ensure same length by trimming the longer one (safer than trusting numbering)
+    L = min(len(ref_ca), len(mov_ca))
+    ref_ca = ref_ca[:L]
+    mov_ca = mov_ca[:L]
+    
+    sup = Superimposer()
+    sup.set_atoms(ref_ca, mov_ca)
+    rot, tran = sup.rotran
+    full_rmsd = sup.rms
+    data["full_rmsd"]=round(full_rmsd,2)
 
-"""
-chain_trajectory = ref_struct[0]['A']
-
-# Extract the specified chains from starting_pdb
-#chain_ids = chain_ids_string.split(',')
-residues_starting = []
-chain= new_struct[0]['A']
-for residue in chain:
-    if is_aa(residue, standard=True):
-        residues_starting.append(residue)
-   
-# Extract residues from chain A in trajectory_pdb
-residues_trajectory = [residue for residue in chain_trajectory if is_aa(residue, standard=True)]
-
-# Ensure that both structures have the same number of residues
-min_length = min(len(residues_starting), len(residues_trajectory))
-residues_starting = residues_starting[:min_length]
-residues_trajectory = residues_trajectory[:min_length]
-
-# Collect CA atoms from the two sets of residues
-atoms_starting = [residue['CA'] for residue in residues_starting if 'CA' in residue]
-atoms_trajectory = [residue['CA'] for residue in residues_trajectory if 'CA' in residue]
-
-# Calculate RMSD using structural alignment
-sup = Superimposer()
-sup.set_atoms(atoms_starting, atoms_trajectory)
-target_rmsd = round(sup.rms, 2)
-"""
 
 
-"""
-ref_model = next(new_struct.get_models())
-mov_model = next(mov_struct.get_models())
-reference_chain_id="A"
-align_chain_id="A"
-# Fetch chains
-try:
-    ref_chain = ref_model[reference_chain_id]
-except KeyError:
-    raise ValueError(f"Reference chain '{reference_chain_id}' not found in {bb_pdb}.")
-try:
-    mov_chain = mov_model[align_chain_id]
-except KeyError:
-    raise ValueError(f"Align chain '{align_chain_id}' not found in {design_cif}.")
+    # -------------------------------------------------------------
+    # 4) Align targets based on CA atoms
+    # -------------------------------------------------------------
+    ref_ca = get_ca_atoms(ref_target)
+    mov_ca = get_ca_atoms(mov_target)
+    
+    # ensure same length by trimming the longer one (safer than trusting numbering)
+    L = min(len(ref_ca), len(mov_ca))
+    ref_ca = ref_ca[:L]
+    mov_ca = mov_ca[:L]
+    
+    sup = Superimposer()
+    sup.set_atoms(ref_ca, mov_ca)
+    rot, tran = sup.rotran
+    target_rmsd = sup.rms
+    data["target_rmsd"]=round(target_rmsd,2)
 
-# Build resseq -> CA atom maps for standard residues
-def chain_ca_map(chain):
-    ca_map = {}
-    for res in chain:
-        # Skip hetero/water; only standard amino acids
-        if not is_aa(res, standard=True):
-            continue
-        if "CA" in res:
-            resseq = res.get_id()[1]  # (hetero flag, resseq, icode) -> take numerical resseq
-            # If there are insertion codes, you could include res.get_id()[2] too,
-            # but for most cases resseq is enough to match.
-            ca_map[(resseq, res.get_id()[2])] = res["CA"]
-    return ca_map
+    
+    # -------------------------------------------------------------
+    # 5) Apply transform to ALL atoms in the moving structure
+    # -------------------------------------------------------------
+    for atom in mov_struct.get_atoms():
+        atom.transform(rot, tran)
+    
+    mov_model = mov_struct[0]
+    ref_target = ref_split[0]["A"]
+    ref_binder = ref_split[0]["C"]
+    ref_ligand = ref_split[0]["F"]
+    
+    mov_target = mov_model["A"]
+    mov_binder = mov_model["B"]
+    mov_ligand = mov_model["FUN"]
+    # -------------------------------------------------------------
+    # 6) Compute unaligned binder and ligand RMSDs
+    # -------------------------------------------------------------
 
-ref_ca = chain_ca_map(ref_chain)
-print(ref_ca)
-mov_ca = chain_ca_map(mov_chain)
-print(mov_ca)
-
-# Intersect by (resseq, icode)
-common_keys = sorted(set(ref_ca.keys()).intersection(mov_ca.keys()),
-                     key=lambda k: (k[0], (k[1] or " ")))
-print(f"found {len(common_keys)} common keys")
-
-if len(common_keys) < 3:
-    raise ValueError(
-        f"Not enough matching residues between chains {reference_chain_id} (ref) and "
-        f"{align_chain_id} (mov) to compute a reliable superposition (found {len(common_keys)})."
-    )
-
-fixed_atoms = [ref_ca[k] for k in common_keys]
-moving_atoms = [mov_ca[k] for k in common_keys]
-
-# Superimpose
-sup = Superimposer()
-sup.set_atoms(fixed_atoms, moving_atoms)
-print("unaligned rmsd:", sup.rms)
-# Apply transform to ALL atoms in the moving structure
-rotation, translation = sup.rotran
-for atom in mov_struct.get_atoms():
-    atom.transform(rotation, translation)
-# recompute rmsd after elignment: 
-mov_model = next(mov_struct.get_models())
-mov_chain= mov_model["A"]
-mov_ca = chain_ca_map(mov_chain)
-common_keys = sorted(set(ref_ca.keys()).intersection(mov_ca.keys()),
-                     key=lambda k: (k[0], (k[1] or " ")))
-print(f"found {len(common_keys)} common keys")
-
-if len(common_keys) < 3:
-    raise ValueError(
-        f"Not enough matching residues between chains {reference_chain_id} (ref) and "
-        f"{align_chain_id} (mov) to compute a reliable superposition (found {len(common_keys)})."
-    )
-
-fixed_atoms = [ref_ca[k] for k in common_keys]
-moving_atoms = [mov_ca[k] for k in common_keys]
-sup.set_atoms(fixed_atoms, moving_atoms)
-rmsd_target = sup.rms
-
-data["target_rmsd"]=round(rmsd_target,2)
-print("target rmsd:", rmsd_target)
-"""
-    # -------compute binder rmsd to original binding site:--------------------------
-    ref_binder_chain = ref_model["C"]
-    mov_binder_chain = mov_model["B"]
-    # Build maps of Cα atoms keyed by (resseq, icode)
+    #  version: from bindcraft
     def ca_map(chain):
         out = {}
         for res in chain:
@@ -518,72 +309,48 @@ print("target rmsd:", rmsd_target)
                 hetflag, resseq, icode = res.get_id()
                 out[(resseq, icode)] = res["CA"]
         return out
-
-    ref_binder_ca = ca_map(ref_binder_chain)
-    mov_binder_ca = ca_map(mov_binder_chain)
-
+    
+    ref_ca = ca_map(ref_binder)
+    mov_ca = ca_map(mov_binder)
+    
     # Common residue keys, ordered by residue number then insertion code
-    common_binder = sorted(set(ref_binder_ca.keys()).intersection(mov_binder_ca.keys()),
+    common = sorted(set(ref_ca.keys()).intersection(mov_ca.keys()),
                     key=lambda k: (k[0], (k[1] or " ")))
-
-    if len(common_binder) < 3:
+    
+    if len(common) < 3:
         raise ValueError(
             f"Not enough matched residues with Cα to compute RMSD without alignment "
-            f"(found {len(common_binder)})."
+            f"(found {len(common)})."
         )
-
-    ref_coords_binder = np.array([ref_binder_ca[k].get_coord() for k in common_binder], dtype=float)
-    mov_coords_binder = np.array([mov_binder_ca[k].get_coord() for k in common_binder], dtype=float)
-
+    
+    ref_coords = np.array([ref_ca[k].get_coord() for k in common], dtype=float)
+    mov_coords = np.array([mov_ca[k].get_coord() for k in common], dtype=float)
+    
     # Unaligned RMSD = sqrt(mean(||ref - mov||^2))
-    diffs = ref_coords_binder - mov_coords_binder
-    rmsd_binder = float(np.sqrt((diffs * diffs).sum(axis=1).mean()))
+    diffs = ref_coords - mov_coords
+    binder_rmsd = float(np.sqrt((diffs * diffs).sum(axis=1).mean()))
+    print(round(binder_rmsd, 2))
+    data["binder_rmsd"]=round(binder_rmsd, 2)
 
-    print("binder rmsd:", rmsd_binder)
-    data["binder_rmsd"]=round(rmsd_binder, 2)
-
+    
+    
+    # ligand atoms: compute RMSD over all heavy atoms
+    ref_lig_atoms = np.array([a.get_coord() for a in ref_ligand.get_atoms()])
+    mov_lig_atoms = np.array([a.get_coord() for a in mov_ligand.get_atoms()])
+    L = min(len(ref_lig_atoms), len(mov_lig_atoms))
+    diffs=ref_lig_atoms[:L]-mov_lig_atoms[:L]
+    lig_rmsd = float(np.sqrt((diffs * diffs).sum(axis=1).mean()))
+    data["lig_rmsd"]=round(lig_rmsd, 2)
+    
+    
+    # -------------------------------------------------------------
+    # 7) Output
+    # -------------------------------------------------------------
+    print("Aligned target RMSD :", round(target_rmsd, 3))
+    print("Binder RMSD (no align):", round(binder_rmsd, 3))
+    print("Ligand RMSD (no align):", round(lig_rmsd, 3))
     # add metrics to csv file
     df = pd.DataFrame([data])
     df.to_csv(f"{AF3_struct}/design_confidences.csv", mode="a", index=False, header=not pd.io.common.file_exists(f"{AF3_struct}/design_confidences.csv"))
     
-
-
-
-
-#### helper function: 
-
-
-def target_rmsd(ref_struct, mov_struct, chain_ids_string="AA"):
-
-    # Extract chain A from trajectory_pdb
-    chain_trajectory = ref_struct[0]['A']
-
-    # Extract the specified chains from starting_pdb
-    chain_ids = chain_ids_string.split(',')
-    residues_starting = []
-    for chain_id in chain_ids:
-        chain_id = chain_id.strip()
-        chain = structure_starting[0][chain_id]
-        for residue in chain:
-            if is_aa(residue, standard=True):
-                residues_starting.append(residue)
-
-    # Extract residues from chain A in trajectory_pdb
-    residues_trajectory = [residue for residue in chain_trajectory if is_aa(residue, standard=True)]
-
-    # Ensure that both structures have the same number of residues
-    min_length = min(len(residues_starting), len(residues_trajectory))
-    residues_starting = residues_starting[:min_length]
-    residues_trajectory = residues_trajectory[:min_length]
-
-    # Collect CA atoms from the two sets of residues
-    atoms_starting = [residue['CA'] for residue in residues_starting if 'CA' in residue]
-    atoms_trajectory = [residue['CA'] for residue in residues_trajectory if 'CA' in residue]
-
-    # Calculate RMSD using structural alignment
-    sup = Superimposer()
-    sup.set_atoms(atoms_starting, atoms_trajectory)
-    rmsd = sup.rms
-
-    return round(rmsd, 2)
-
+    
