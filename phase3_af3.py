@@ -121,7 +121,7 @@ import re
 from Bio.PDB import PDBParser, MMCIFParser, Superimposer, DSSP, Selection, Polypeptide, PDBIO, Select, Chain, PDBIO
 from Bio.PDB.Polypeptide import is_aa
 
-AF3_struct= f"{AF3_DIR}/output"
+AF3_struct= f"{AF3_DIR}/output2"
 for confidence in glob.glob(f"{AF3_struct}/*/*_summary_confidences.json"):
     print("condidence:", confidence)
 
@@ -132,7 +132,7 @@ for confidence in glob.glob(f"{AF3_struct}/*/*_summary_confidences.json"):
     #load JSON
     with open(confidence, "r") as f:
         data = json.load(f) # data["chain_iptm", "chain_pair_iptm", "chain_pair_pae_min","chain_ptm","fraction_disordered": 0.0, "has_clash": 0.0, "iptm": 0.7, "ptm": 0.75, "ranking_score": 0.71]
-    data["id"]=f"{design_name}_seq0"
+    data["id"]=f"{design_name}_seq1"
     # also get atoms plddts from ..._confidences.json:
     conf=confidence.replace("_summary", "")
     with open(conf,"r") as f:
