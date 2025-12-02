@@ -1,4 +1,4 @@
-# De novo *Chemically Induced Dimer* design pipeline using RFdiffusionAA, pMPNN & co
+# De novo *Chemically Induced Dimers* design pipeline using RFdiffusionAA, pMPNN & co
 
 *Designing binders for protein+ligand complexes*
 
@@ -18,8 +18,11 @@ Ours will be a bit different, in order to be able to design Chemically induced d
 0) Binder backbone generation with RFdiffusion all_atoms, scaffolding the target + ligand complex (i.e. generating the backbone on top of the target, on its C-term or N-term).
 1) Generating a sequence for the binder with protein MPNN. The whole output from the previous step (target + ligand + binder backbone) is used, but only the binder sequence is redesigned.
 2) The generated binders are repredicted with AF2 from their sequence, and their structure is re-aligned to their initialy diffused backbone, in order to see if a sequence exists for the diffused backbone, and if this binder can fold. Binders are filtered based on their plDDT and their RMSD to the initial predicted backbone.
-3) Ligand-pocket redesign /or whole binder redesign with ligand MPNN.
+3) Ligand-pocket redesign /or whole binder redesign with ligand MPNN. 
 4) target + binder + ligand reprediction with af3
+5) Filtering: keep only the binders with a high plddt, ipTM and rmsd to the original backbone
+6) Repredict the binder + target complex (no ligand) with ColabDesign
+7) Filter the binders to keep those that are not supposed to bind with no ligand: low ipTM, and high binder RMSD to the original binding site when the ligand is not there. 
 
 
 
