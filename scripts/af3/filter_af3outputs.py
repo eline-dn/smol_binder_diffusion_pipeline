@@ -11,6 +11,14 @@ import time
 import importlib
 from shutil import copy2
 import Bio.PDB
+from scipy.special import softmax
+from colabdesign import mk_afdesign_model, clear_mem
+from colabdesign.mpnn import mk_mpnn_model
+from colabdesign.af.alphafold.common import residue_constants
+from colabdesign.af.loss import get_ptm, mask_loss, get_dgram_bins, _get_con_loss, get_plddt_loss, get_exp_res_loss, get_pae_loss, get_con_loss, get_rmsd_loss, get_dgram_loss, get_fape_loss
+from colabdesign.shared.utils import copy_dict
+from colabdesign.shared.prep import prep_pos
+from Bio.PDB import PDBIO, StructureBuilder, PDBParser
 ### Path to this cloned GitHub repo:
 SCRIPT_DIR = "/work/lpdi/users/eline/smol_binder_diffusion_pipeline"  # edit this to the GitHub repo path. Throws an error by default.
 assert os.path.exists(SCRIPT_DIR)
@@ -132,7 +140,7 @@ def _copy_structure_with_only_chain(structure, chain_id):
                          atom.altloc, atom.fullname, element=atom.element)
     return sb.get_structure()
 
-def extract_chain(input_cif_path: str, output_pdb_path: str, chain_id: str):
+def extract_chain(input_cif_path: str, template: str, chain_id: str):
     """
     Extracts a specific chain from a PDB file using _copy_structure_with_only_chain
     and saves it to a new PDB file with explicit MODEL/ENDMDL records.
@@ -150,7 +158,7 @@ def extract_chain(input_cif_path: str, output_pdb_path: str, chain_id: str):
     new_structure = _copy_structure_with_only_chain(structure, chain_id)
     # Save the new structure, explicitly writing model records
     io.set_structure(new_structure)
-    io.save(output_pdb_path)
+    io.save(template)
 
 
 def unaligned_rmsd(reference_pdb, align_pdb, reference_chain_id, align_chain_id):
@@ -297,7 +305,7 @@ for design_name in success_df.id:
   print(binder_sequence)
   #run reprediction with Colab Design:
   # compile complex prediction model
-  complex_prediction_model = mk_afdesign_model(protocol="binder", num_recycles=3, data_dir=params, 
+  model = mk_afdesign_model(protocol="binder", num_recycles=3, data_dir=params, 
                                               use_multimer=True,
                                               use_templates=True,
                                                use_initial_guess=False, #Introduce bias by providing binder atom positions as a starting point for prediction.
@@ -322,7 +330,7 @@ for design_name in success_df.id:
                   models=[model_num],
                   num_recycles=3)
 
-    predicted_complex_pdb = os.path.join(REP_DIR, f"{binder_name}_model_{model_num+1}_repredicted_nolig.pdb")
+    predicted_complex_pdb = os.path.join(REP_DIR, f"{design_name}_model_{model_num+1}_repredicted_nolig.pdb")
     model.save_pdb(predicted_complex_pdb)
     prediction_metrics = copy_dict(model.aux["log"]) # contains plddt, ptm, i_ptm, pae, i_pae
 
@@ -344,14 +352,13 @@ for design_name in success_df.id:
 
   data={}
   for key in prediction_stats[1].keys():
-    data[key]=(prediction_stats[0][key] + prediction_stats[1][key])/2
+    data[key]=(prediction_stats[1][key] + prediction_stats[2][key])/2
   data["id"]=design_name
   data["binder_sequence"]=binder_sequence
   data["complex_path"]=cif_path
 
   df = pd.DataFrame([data])
   df.to_csv(f"{REP_DIR}/no_lig_confidences.csv", mode="a", index=False, header=not pd.io.common.file_exists(f"{REP_DIR}/no_lig_confidences.csv"))
-
 
 
 # at the end: merge the two confidence dfs:
