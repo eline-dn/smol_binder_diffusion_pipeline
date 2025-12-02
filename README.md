@@ -21,7 +21,7 @@ Ours will be a bit different, in order to be able to design Chemically induced d
 3) Ligand-pocket redesign /or whole binder redesign with ligand MPNN. 
 4) target + binder + ligand reprediction with af3
 5) Filtering: keep only the binders with a high plddt, ipTM and rmsd to the original backbone
-6) Repredict the binder + target complex (no ligand) with ColabDesign
+6) Repredict the binder + target complex (no ligand) with ColabDesign (target template but no template for the binder, allowing a docking outside the initial binding site)
 7) Filter the binders to keep those that are not supposed to bind with no ligand: low ipTM, and high binder RMSD to the original binding site when the ligand is not there. 
 
 
