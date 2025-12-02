@@ -99,13 +99,13 @@ success_df=df[(df['full_rmsd'] <=1.5) & (df['iptm'] >=0.8)& (df['binder_rmsd']<=
 # write out successful binders .csv file
 success_df.to_csv(f"selected1_binder_metrics_df.csv", index=False)
 
-
+succes_df=pd.read_csv(f"selected1_binder_metrics_df.csv")
 #for those binders, repredict the complex target + binder without ligand and select only those with a low ipTM:
 # reprediction with colabDEsign form target template + binder sequence
 
 # target template: 
 
-ef _copy_structure_with_only_chain(structure, chain_id):
+def _copy_structure_with_only_chain(structure, chain_id):
     """Return a new Structure containing only model 0 and a deep copy of chain `chain_id`."""
     # Build a tiny structure hierarchy: Structure -> Model(0) -> Chain(chain_id) -> Residues/Atoms
 
@@ -342,21 +342,21 @@ for design_name in success_df.id:
 
     prediction_stats[model_num+1] = stats # 2 dictionnaries index 1 and 2 to eventually add to the metrics df
 
-    data={}
-    for key in prediction_stats[0].keys():
-      data[key]=(prediction_stats[0][key] + prediction_stats[1][key])/2
-    data["id"]=design_name
-    data["binder_sequence"]=binder_sequence
-    data["complex_path"]=cif_path
+  data={}
+  for key in prediction_stats[1].keys():
+    data[key]=(prediction_stats[0][key] + prediction_stats[1][key])/2
+  data["id"]=design_name
+  data["binder_sequence"]=binder_sequence
+  data["complex_path"]=cif_path
 
   df = pd.DataFrame([data])
-  df.to_csv(f"{AF3_struct}/no_lig_confidences.csv", mode="a", index=False, header=not pd.io.common.file_exists(f"{AF3_struct}/no_lig_confidences.csv"))
+  df.to_csv(f"{REP_DIR}/no_lig_confidences.csv", mode="a", index=False, header=not pd.io.common.file_exists(f"{REP_DIR}/no_lig_confidences.csv"))
 
 
 
 # at the end: merge the two confidence dfs:
 df_merged = pd.merge(success_df, df, on="id", how="inner", suffixes=("_df1", "_df2"))
-df_merged.to_csv(f"{AF3_struct}/design_all_confidences.csv")
+df_merged.to_csv(f"{AF3_DIR}/design_all_confidences.csv")
 
 
 # scatter plot for iptm
