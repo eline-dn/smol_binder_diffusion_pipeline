@@ -360,12 +360,15 @@ for design_name in success_df.id:
   df = pd.DataFrame([data])
   df.to_csv(f"{REP_DIR}/no_lig_confidences.csv", mode="a", index=False, header=not pd.io.common.file_exists(f"{REP_DIR}/no_lig_confidences.csv"))
 
-
+#----------------------------------------------------------------------------------------------------------------------------------------
+REP_DIR = f"{AF3_DIR}/no_lig_repredictions"
+df=pd.read_csv(f"{REP_DIR}/no_lig_confidences.csv")
+success_df=pd.read_csv(f"selected1_binder_metrics_df.csv")
 # at the end: merge the two confidence dfs:
-df_merged = pd.merge(success_df, df, on="id", how="inner", suffixes=("_df1", "_df2"))
+df_merged = pd.merge(success_df, df, on="id", how="inner")
 df_merged.to_csv(f"{AF3_DIR}/design_all_confidences.csv")
 
-
+import seaborn as sns
 # scatter plot for iptm
 _=sns.scatterplot(data=df_merged, x='nolig_i_pTM', y='iptm')
 nolig_i_pTM = 0.5
@@ -399,16 +402,13 @@ plt.close()
 # filter
 # plot final selected binders 
 selected2_binder_list=df_merged[(df_merged['nolig_binder_rmsd'] >=1.5) & (df_merged['nolig_i_pTM'] <=0.5)& (df_merged['nolig_pLDDT']>=0.7)].id
-df_merged['selected2'] = df_merged['id'].isin(selected1_binder_list)
+df_merged['selected2'] = df_merged['id'].isin(selected2_binder_list)
 
 success_df2=df_merged[(df_merged['nolig_binder_rmsd'] >=1.5) & (df_merged['nolig_i_pTM'] <=0.5)& (df_merged['nolig_pLDDT']>=0.7)]
 # write out successful binders .csv file
 filtered=f"{AF3_DIR}/filtered"
+
 success_df2.to_csv(f"{filtered}/selected2_binder_all_metrics_df.csv", index=False)
 
 extract_filtered_binders(success_df2, "complex_path", filtered)
-
-
-
-
 
