@@ -56,11 +56,113 @@ def find_hbonds_to_residue_atom(pose, lig_seqpos, target_atom): # the one actual
                     # It is assumed that polar backbone H is only attached to backbone N
                     if res.atom_is_backbone(polar_H):
                         print(res.seqpos(), target_atom, res.atom_name(polar_H), get_angle(res.xyz(1), res.xyz(polar_H), pose.residue(lig_seqpos).xyz(target_atom)))
-                        if get_angle(res.xyz(1), res.xyz(polar_H), pose.residue(lig_seqpos).xyz(target_atom)) < 140.0:
+                        if get_angle(res.xyz("N"), res.xyz(polar_H), pose.residue(lig_seqpos).xyz(target_atom)) < 140.0:
                             continue
                     HBond_res += 1
                     break
     return HBond_res
+
+"""
+def find_hbonds_from_prot(pose, lig_seqpos, target_atom): # test
+    """
+    Counts how many Hbond contacts input atom has with the protein.
+    """
+    HBond_res = 0
+
+    for res in pose.residues:
+        if res.seqpos() == lig_seqpos or res.is_ligand():
+            break
+        if # res in chain A: 
+            continue
+        if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz('CA')).norm() < 10.0:
+            #for atoms in res. # find the residues's  atoms
+                if atoms in # list of atoms capable of receiving an H in a hydrogen bond
+                if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz(polar_H)).norm() < 2.5:
+                    # If the polar atom is from the backbone then check that the X-H...Y angle is close to linear.
+                    # It is assumed that polar backbone H is only attached to backbone N
+                    if res.atom_is_backbone(polar_H):
+                        print(res.seqpos(), target_atom, res.atom_name(polar_H), get_angle(res.xyz(1), res.xyz(polar_H), pose.residue(lig_seqpos).xyz(target_atom)))
+                        if get_angle(res.xyz("N"), res.xyz(polar_H), pose.residue(lig_seqpos).xyz(target_atom)) < 140.0:
+                            continue
+                    HBond_res += 1
+                    break
+    return HBond_res
+
+"""
+# another suggestion: to be tested
+from pyrosetta import *
+from pyrosetta.rosetta.core.scoring.hbonds import HBondSet
+from pyrosetta.rosetta.core.pose import AtomID
+
+def find_hbonds_ligand_atom_to_chainB(pose, lig_idx, atom_name="A1", target_chain="B"):
+    """
+    Returns all H-bonds involving the ligand atom 'atom_name'
+    where the partner atom belongs to residues in chain B.
+    """
+    # --- 1. Build the HBondSet for the pose ---------------------
+    hbset = HBondSet()
+    hbset.setup_for_residue_pair_energies(pose, False)
+
+    # --- 2. Locate ligand AtomID --------------------------------
+    lig_res = pose.residue(lig_idx)
+    if not lig_res.has(atom_name):
+        raise ValueError(f"Ligand residue {lig_idx} has no atom named '{atom_name}'")
+
+    atom_id = AtomID(lig_res.atom_index(atom_name), lig_idx)
+
+    # --- 3. Find all H-bonds involving this atom ----------------
+    hbonds = hbset.atom_hbonds_all(atom_id)
+
+    results = []
+
+    for hb in hbonds:
+        don_res = hb.don_res()   # donor residue index
+        acc_res = hb.acc_res()   # acceptor residue index
+
+        # Identify which side is ligand and which is protein
+        if don_res == lig_idx:
+            partner = acc_res
+            donor_is_ligand = True
+        elif acc_res == lig_idx:
+            partner = don_res
+            donor_is_ligand = False
+        else:
+            continue  # should not happen, atom_hbonds_all already filtered to relevant atom
+
+        # Check partner is in chain B
+        if pose.pdb_info().chain(partner) != target_chain:
+            continue
+
+        # Collect useful info
+        partner_res = pose.residue(partner)
+        partner_atom = (hb.acc_atm() if donor_is_ligand else hb.don_atm())
+        partner_atom_name = partner_res.atom_name(partner_atom).strip()
+
+        results.append({
+            "lig_atom": atom_name,
+            "lig_idx": lig_idx,
+            "partner_resi": partner,
+            "partner_chain": target_chain,
+            "partner_atom": partner_atom_name,
+            "lig_is_donor": donor_is_ligand,
+            "energy": hb.energy(),
+            "distance": hb.distance()
+        })
+
+    return results
+
+
+# ------------------ Example usage ------------------
+
+# pose = pyrosetta.pose_from_file("complex_with_ligand.pdb")
+# lig_idx = 250  # example ligand position
+
+# hb_info = find_hbonds_ligand_atom_to_chainB(pose, lig_idx, "A1", "B")
+# for h in hb_info:
+#     print(h)
+
+
+
 #-------------------------------
 
 # Ligand information
@@ -124,15 +226,27 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     ligand_pose = pyrosetta.rosetta.core.pose.Pose()
     pyrosetta.rosetta.core.pose.append_subpose_to_pose(ligand_pose, pose, pose.size(), pose.size(), 1)
     # we will look for these atoms: 
-    at_list=list(("O1", "O2","N1","O3"))
+    at_list=list(("O1", "O2","N1","O3", "O5", "O4"))
     for n in at_list:
         df_scores.at[i, f"{n}_hbond"] = find_hbonds_to_residue_atom(pose, ligand_resno, n) # this function Counts how many Hbond contacts input atom has with the protein.
         # the target atoms have to be adapted to the ligand
 
-    if any([df_scores.at[i, x] > 0.0 for x in ['N1_hbond','O1_hbond','O2_hbond', 'O3_hbond']]):
+    if any([df_scores.at[i, x] > 0.0 for x in ['N1_hbond','O1_hbond','O2_hbond', 'O3_hbond','O5_hbond','O4_hbond']]):
         df_scores.at[i, 'binder_hbond'] = True
     else:
         df_scores.at[i, 'binder_hbond'] = False
+
+    # test the other hbond function
+    h_list=list(("H1","H9","H10", "H11")) 
+    for h in h_list:
+        hb_info = find_hbonds_ligand_atom_to_chainB(pose, lig_idx, h, "B")
+    for h in hb_info:
+         print(h)
+
+"""
+test
+res.OOC()
+res.OH()
     ## Calculating shape complementarity between binder and target
     
     #lig_sel = pyrosetta.rosetta.core.select.residue_selector.ResidueIndexSelector(ligand_seqpos)
