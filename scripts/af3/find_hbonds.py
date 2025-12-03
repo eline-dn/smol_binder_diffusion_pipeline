@@ -1,4 +1,4 @@
-
+from Bio.PDB import PDBIO
 import os
 import pyrosetta as pyr
 import pyrosetta.rosetta
@@ -22,10 +22,8 @@ SCRIPT_PATH = os.path.dirname(__file__)
 sys.path.append(f"{SCRIPT_PATH}/../../utils")
 
 import Bio.PDB
-PDB_parser = Bio.PDB.PDBParser(QUIET=True)
+#PDB_parser = Bio.PDB.PDBParser(QUIET=True)
 CIF_parser = Bio.PDB.MMCIFParser(QUIET=True)
-
-    structure = parser.get_structure(strucid, ciffile)
 
 def get_angle(a1, a2, a3):
     a1 = np.array(a1)
@@ -102,7 +100,7 @@ pyr.init(f"{extra_res_fa} -dalphaball {DAB} -beta_nov16 -run:preserve_header -mu
 df_scores = pd.DataFrame()
 
 for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we convert to pdb for pyrosetta
-    structure = parser.get_structure("x", INPUT_PDB)
+    structure = CIF_parser.get_structure("x", INPUT_PDB)
     io = PDBIO()
     io.set_structure(structure)
     pdbfile=INPUT_PDB.replace(".cif", ".pdb") # convert mmcif to pdb
