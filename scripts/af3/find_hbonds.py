@@ -101,6 +101,10 @@ df_scores = pd.DataFrame()
 
 for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we convert to pdb for pyrosetta
     structure = CIF_parser.get_structure("x", INPUT_PDB)
+    old_id = "FUN"
+    new_id = "F"
+    chain=structure[0][old_id]
+    chain.id = new_id
     io = PDBIO()
     io.set_structure(structure)
     pdbfile=INPUT_PDB.replace(".cif", ".pdb") # convert mmcif to pdb
