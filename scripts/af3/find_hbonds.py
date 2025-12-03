@@ -105,6 +105,9 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     new_id = "F"
     chain=structure[0][old_id]
     chain.id = new_id
+    for res in structure.get_residues():
+        if res.resname.strip().startswith("LIG"):  # or your rule
+            res.resname = "FUN"
     io = PDBIO()
     io.set_structure(structure)
     pdbfile=INPUT_PDB.replace(".cif", ".pdb") # convert mmcif to pdb
@@ -123,7 +126,7 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     # we will look for these atoms: 
     at_list=list(("O1", "O2","N1","O3"))
     for n in at_list:
-        df_scores.at[i, f"{n}_hbond"] = scoring_utils.find_hbonds_to_residue_atom(pose, ligand_seqpos, n) # this function Counts how many Hbond contacts input atom has with the protein.
+        df_scores.at[i, f"{n}_hbond"] = find_hbonds_to_residue_atom(pose, ligand_resno, n) # this function Counts how many Hbond contacts input atom has with the protein.
         # the target atoms have to be adapted to the ligand
 
     if any([df_scores.at[i, x] > 0.0 for x in ['N1_hbond','O1_hbond','O2_hbond', 'O3_hbond']]):
