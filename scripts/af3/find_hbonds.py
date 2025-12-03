@@ -22,8 +22,10 @@ SCRIPT_PATH = os.path.dirname(__file__)
 sys.path.append(f"{SCRIPT_PATH}/../../utils")
 
 import Bio.PDB
-BIO_PDB_parser = Bio.PDB.PDBParser(QUIET=True)
+PDB_parser = Bio.PDB.PDBParser(QUIET=True)
+CIF_parser = Bio.PDB.MMCIFParser(QUIET=True)
 
+    structure = parser.get_structure(strucid, ciffile)
 
 def get_angle(a1, a2, a3):
     a1 = np.array(a1)
@@ -99,8 +101,14 @@ pyr.init(f"{extra_res_fa} -dalphaball {DAB} -beta_nov16 -run:preserve_header -mu
          f"-multithreading true -multithreading:total_threads {NPROC} -multithreading:interaction_graph_threads {NPROC}")
 df_scores = pd.DataFrame()
 
-for i,INPUT_PDB in enumerate(args.pdb):
-    input_pose = pyrosetta.pose_from_file(INPUT_PDB)
+for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we convert to pdb for pyrosetta
+    structure = parser.get_structure("x", INPUT_PDB)
+    io = PDBIO()
+    io.set_structure(structure)
+    pdbfile=INPUT_PDB.replace(".cif", ".pdb") # convert mmcif to pdb
+    io.save(pdbfile)
+    
+    input_pose = pyrosetta.pose_from_file(pdbfile)
     pose = input_pose.clone()
     ligand_resno = pose.size()
     print(ligand_resno)
