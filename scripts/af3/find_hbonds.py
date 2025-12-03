@@ -1,6 +1,6 @@
 
 import os
-import pyrosetta
+import pyrosetta as pyr
 import pyrosetta.rosetta
 import numpy as np
 from pyrosetta.rosetta.core.scoring import fa_rep
@@ -20,9 +20,6 @@ import io
 
 SCRIPT_PATH = os.path.dirname(__file__)
 sys.path.append(f"{SCRIPT_PATH}/../../utils")
-import no_ligand_repack
-import scoring_utils
-import design_utils
 
 import Bio.PDB
 BIO_PDB_parser = Bio.PDB.PDBParser(QUIET=True)
@@ -67,7 +64,7 @@ def find_hbonds_to_residue_atom(pose, lig_seqpos, target_atom): # the one actual
 #-------------------------------
 
 # Ligand information
-params = [f"{SCRIPT_DIR}/input/FUN.params"]  # Rosetta params file(s)
+params = [f"/work/lpdi/users/eline/smol_binder_diffusion_pipeline/input/FUN.params"]  # Rosetta params file(s)
 LIGAND = "FUN"
 
 
@@ -106,6 +103,7 @@ for i,INPUT_PDB in enumerate(args.pdb):
     input_pose = pyrosetta.pose_from_file(INPUT_PDB)
     pose = input_pose.clone()
     ligand_resno = pose.size()
+    print(ligand_resno)
     assert pose.residue(ligand_resno).is_ligand()
     
     # Using a custom function to find HBond partners of the groups that might be involved
