@@ -55,7 +55,7 @@ def find_hbonds_to_residue_atom(pose, lig_seqpos, target_atom): # the one actual
                     # If the polar atom is from the backbone then check that the X-H...Y angle is close to linear.
                     # It is assumed that polar backbone H is only attached to backbone N
                     if res.atom_is_backbone(polar_H):
-                        print(res.seqpos(), target_atom, res.atom_name(polar_H), get_angle(res.xyz(1), res.xyz(polar_H), pose.residue(lig_seqpos).xyz(target_atom)))
+                        print("infos hscores for target atom:",target_atom,res.seqpos(), target_atom, res.atom_name(polar_H), get_angle(res.xyz(1), res.xyz(polar_H), pose.residue(lig_seqpos).xyz(target_atom)))
                         if get_angle(res.xyz("N"), res.xyz(polar_H), pose.residue(lig_seqpos).xyz(target_atom)) < 140.0:
                             continue
                     HBond_res += 1
@@ -64,9 +64,7 @@ def find_hbonds_to_residue_atom(pose, lig_seqpos, target_atom): # the one actual
 
 """
 def find_hbonds_from_prot(pose, lig_seqpos, target_atom): # test
-    """
-    Counts how many Hbond contacts input atom has with the protein.
-    """
+    #Counts how many Hbond contacts input atom has with the protein.
     HBond_res = 0
 
     for res in pose.residues:
@@ -92,7 +90,7 @@ def find_hbonds_from_prot(pose, lig_seqpos, target_atom): # test
 # another suggestion: to be tested
 from pyrosetta import *
 from pyrosetta.rosetta.core.scoring.hbonds import HBondSet
-from pyrosetta.rosetta.core.pose import AtomID
+from pyrosetta.rosetta.core.id import AtomID
 
 def find_hbonds_ligand_atom_to_chainB(pose, lig_idx, atom_name="A1", target_chain="B"):
     """
@@ -218,7 +216,7 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     input_pose = pyrosetta.pose_from_file(pdbfile)
     pose = input_pose.clone()
     ligand_resno = pose.size()
-    print(ligand_resno)
+    print("lig pos:",ligand_resno)
     assert pose.residue(ligand_resno).is_ligand()
     
     # Using a custom function to find HBond partners of the groups that might be involved
@@ -235,20 +233,20 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
         df_scores.at[i, 'binder_hbond'] = True
     else:
         df_scores.at[i, 'binder_hbond'] = False
-
+    print("h_scores:",df_scores)
     # test the other hbond function
     h_list=list(("H1","H9","H10", "H11")) 
     for h in h_list:
+        print("find hbonds with h:",h)
         hb_info = find_hbonds_ligand_atom_to_chainB(pose, ligand_resno, h, "B")
     for h in hb_info:
-         print(h)
+         print("hb infos:",h)
 
-"""
-test
-res.OOC()
-res.OH() """
+    """
+    test
+    res.OOC()
+    res.OH() """
     ## Calculating shape complementarity between binder and target
-    
     #lig_sel = pyrosetta.rosetta.core.select.residue_selector.ResidueIndexSelector(ligand_seqpos)
     target_sel = pyrosetta.rosetta.core.select.residue_selector.ChainSelector("A")
     binder_sel = pyrosetta.rosetta.core.select.residue_selector.ChainSelector("B")
