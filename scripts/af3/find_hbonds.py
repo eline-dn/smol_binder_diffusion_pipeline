@@ -164,7 +164,7 @@ def find_hbonds_ligand_atom_to_chainB(pose, lig_idx, atom_name="A1", target_chai
 #-------------------------------
 
 # Ligand information
-params = [f"/work/lpdi/users/eline/smol_binder_diffusion_pipeline/input/FUN.params"]  # Rosetta params file(s)
+params = [f"FUN.params"]  # Rosetta params file(s)
 LIGAND = "FUN"
 
 
@@ -235,7 +235,7 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
         df_scores.at[i, 'binder_hbond'] = False
     print("h_scores:",df_scores)
     # test the other hbond function
-    h_list=list(("H1","H9","H10", "H11")) 
+    h_list=list(("H6","H9","H10", "H11")) 
     for h in h_list:
         print("find hbonds with h:",h)
         hb_info = find_hbonds_ligand_atom_to_chainB(pose, ligand_resno, h, "B")
