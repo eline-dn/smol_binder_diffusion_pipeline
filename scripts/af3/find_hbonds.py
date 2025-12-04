@@ -159,9 +159,30 @@ def find_hbonds_ligand_atom_to_chainB(pose, lig_idx, atom_name="A1", target_chai
 # for h in hb_info:
 #     print(h)
 
+# or with bindcraft's scoring:---------------------------------------------------------------------
+# create a pose with just ligand and binder 
+pose = 
+
+# analyze interface statistics
+iam = InterfaceAnalyzerMover()
+iam.set_interface("A_B")
+scorefxn = pr.get_fa_scorefxn()
+iam.set_scorefunction(scorefxn)
+iam.set_compute_packstat(True)
+iam.set_compute_interface_energy(True)
+iam.set_calc_dSASA(True)
+iam.set_calc_hbond_sasaE(True)
+iam.set_compute_interface_sc(True)
+iam.set_pack_separated(True)
+iam.apply(pose)
 
 
-#-------------------------------
+# retrieve statistics
+interfacescore = iam.get_all_data()
+interface_sc = interfacescore.sc_value # shape complementarity
+interface_interface_hbonds = interfacescore.interface_hbonds # number of interface H-bonds
+
+#---------------------------------------------------------------------------------------------------------------
 
 # Ligand information
 params = [f"FUN.params"]  # Rosetta params file(s)
@@ -234,14 +255,62 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     else:
         df_scores.at[i, 'binder_hbond'] = False
     print("h_scores:",df_scores)
+
+    # or with bindcraft's scoring:---------------------------------------------------------------------
+    # create a pose with just ligand and binder 
+    """ might not be necessary
+    pose_bc = pyrosetta.rosetta.core.pose.Pose()
+    binder_start = pose.conformation().chain_begin(2)
+    pyrosetta.rosetta.core.pose.append_subpose_to_pose(ligand_pose, pose_bc, binder_start, pose_bc.size(), 1) # targetpose, source pose, start source, stop source, start target, /!\ residues are 1 indexed in pyrosetta
+    """
+    from pyrosetta.rosetta.protocols.analysis import InterfaceAnalyzerMover
+    # analyze interface hbonds
+    iam = InterfaceAnalyzerMover()
+    iam.set_interface("F_B")
+    scorefxn = pr.get_fa_scorefxn()
+    iam.set_scorefunction(scorefxn)
+    iam.set_compute_packstat(True)
+    iam.set_compute_interface_energy(True)
+    iam.set_calc_dSASA(True)
+    iam.set_calc_hbond_sasaE(True)
+    iam.set_compute_interface_sc(True)
+    iam.set_pack_separated(True)
+    iam.apply(pose)
+    
+    
+    # retrieve statistics
+    interfacescore = iam.get_all_data()
+    #interface_sc = interfacescore.sc_value # shape complementarity
+    interface_interface_hbonds = interfacescore.interface_hbonds # number of interface H-bonds
+    df_scores.at[i, 'bc_binder_hbond'] = interface_interface_hbonds
+    # analyze interface sc
+    iam = InterfaceAnalyzerMover()
+    iam.set_interface("AF_B")
+    scorefxn = pr.get_fa_scorefxn()
+    iam.set_scorefunction(scorefxn)
+    iam.set_compute_packstat(True)
+    iam.set_compute_interface_energy(True)
+    iam.set_calc_dSASA(True)
+    iam.set_calc_hbond_sasaE(True)
+    iam.set_compute_interface_sc(True)
+    iam.set_pack_separated(True)
+    iam.apply(pose)
+    
+    
+    # retrieve statistics
+    interfacescore = iam.get_all_data()
+    interface_sc = interfacescore.sc_value # shape complementarity
+    #interface_interface_hbonds = interfacescore.interface_hbonds # number of interface H-bonds
+    df_scores.at[i, 'bc_sc_lig.enz_binder'] = interface_sc
     # test the other hbond function
+    """
     h_list=list(("H6","H9","H10", "H11")) 
     for h in h_list:
         print("find hbonds with h:",h)
         hb_info = find_hbonds_ligand_atom_to_chainB(pose, ligand_resno, h, "B")
     for h in hb_info:
          print("hb infos:",h)
-
+    """
     """
     test
     res.OOC()
