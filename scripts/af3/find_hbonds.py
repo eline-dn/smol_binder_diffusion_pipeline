@@ -239,14 +239,14 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     # test the other hbond function
     h_list=list(("H1","H9","H10", "H11")) 
     for h in h_list:
-        hb_info = find_hbonds_ligand_atom_to_chainB(pose, lig_idx, h, "B")
+        hb_info = find_hbonds_ligand_atom_to_chainB(pose, ligand_resno, h, "B")
     for h in hb_info:
          print(h)
 
 """
 test
 res.OOC()
-res.OH()
+res.OH() """
     ## Calculating shape complementarity between binder and target
     
     #lig_sel = pyrosetta.rosetta.core.select.residue_selector.ResidueIndexSelector(ligand_seqpos)
