@@ -161,8 +161,8 @@ def find_hbonds_ligand_atom_to_chainB(pose, lig_idx, atom_name="A1", target_chai
 
 # or with bindcraft's scoring:---------------------------------------------------------------------
 # create a pose with just ligand and binder 
-pose = 
 
+"""
 # analyze interface statistics
 iam = InterfaceAnalyzerMover()
 iam.set_interface("A_B")
@@ -181,7 +181,7 @@ iam.apply(pose)
 interfacescore = iam.get_all_data()
 interface_sc = interfacescore.sc_value # shape complementarity
 interface_interface_hbonds = interfacescore.interface_hbonds # number of interface H-bonds
-
+"""
 #---------------------------------------------------------------------------------------------------------------
 
 # Ligand information
@@ -267,7 +267,7 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     # analyze interface hbonds
     iam = InterfaceAnalyzerMover()
     iam.set_interface("F_B")
-    scorefxn = pr.get_fa_scorefxn()
+    scorefxn = pyr.get_fa_scorefxn()
     iam.set_scorefunction(scorefxn)
     iam.set_compute_packstat(True)
     iam.set_compute_interface_energy(True)
@@ -286,7 +286,7 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     # analyze interface sc
     iam = InterfaceAnalyzerMover()
     iam.set_interface("AF_B")
-    scorefxn = pr.get_fa_scorefxn()
+    scorefxn = pyr.get_fa_scorefxn()
     iam.set_scorefunction(scorefxn)
     iam.set_compute_packstat(True)
     iam.set_compute_interface_energy(True)
