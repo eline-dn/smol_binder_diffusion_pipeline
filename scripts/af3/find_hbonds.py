@@ -89,6 +89,21 @@ def find_hbonds_to_ligand_h(pose, lig_seqpos, target_atom):
                     break
     return HBond_res
 
+def find_rosetta_hbonds(pose,lig_seqpos):
+	res={}
+	from pyrosetta.rosetta.protocols.protein_interface_design.filters import HbondsToAtomFilter
+	filter= HbondsToAtomFilter(resnum=lig_seqpos)
+	res["ap"]=filter.apply(pose, 1)
+	res["comp"]=filter.compute(pose)
+	res["score"]=filter.score(pose)
+
+	from pyrosetta.rosetta.core.scoring.hbonds import HBondSet
+	hbset = HBondSet()
+	hbset.setup_for_residue_pair_energies(pose, False)
+	hbonds = hbset.atom_hbonds_all(AtomID(atom_index, lig_seqpos))
+	res["hbonds"]=hbonds
+return(res)
+
 """
 def find_hbonds_from_prot(pose, lig_seqpos, target_atom): # test
     #Counts how many Hbond contacts input atom has with the protein.
@@ -300,6 +315,13 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     else:
         df_scores.at[i, 'binder_hbond_acc'] = False
     print("h_scores:",df_scores)
+#---------------------------------pyrosetta's hbonds: another scoring method
+	res=find_rosetta_hbonds(pose, pose.size())
+	df=pd.df(res)
+	print(res)
+	df.to_csv("test_h.csv", "a")
+
+
     # or with bindcraft's scoring:---------------------------------------------------------------------
     # create a pose with just ligand and binder 
     """ might not be necessary
