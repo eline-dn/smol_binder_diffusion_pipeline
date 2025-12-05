@@ -49,8 +49,8 @@ def find_hbonds_to_residue_atom(pose, lig_seqpos, target_atom): # the one actual
     for res in pose.residues:
         if res.seqpos() == lig_seqpos or res.is_ligand():
             break
-        if pose.pdb_info().chain(res.seqpos())!= 2: # if the residue isn't in binder chain
-            continue
+        """if pose.pdb_info().chain(res.seqpos())!= 2: # if the residue isn't in binder chain
+            continue"""
         if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz('CA')).norm() < 10.0:
             for polar_H in res.Hpos_polar():
                 if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz(polar_H)).norm() < 3.5:
@@ -61,7 +61,32 @@ def find_hbonds_to_residue_atom(pose, lig_seqpos, target_atom): # the one actual
                         if get_angle(res.xyz("N"), res.xyz(polar_H), pose.residue(lig_seqpos).xyz(target_atom)) < 140.0:
                             continue
                     HBond_res += 1
-                    break
+                    #break
+    return HBond_res
+
+def find_hbonds_to_ligand_h(pose, lig_seqpos, target_atom): 
+    """
+    Counts how many Hbond contacts input atom has with the protein.
+    """
+    HBond_res = 0
+
+    for res in pose.residues:
+        if res.seqpos() == lig_seqpos or res.is_ligand():
+            break
+        """if pose.pdb_info().chain(res.seqpos())!= 2: # if the residue isn't in binder chain
+            continue"""
+        if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz('CA')).norm() < 10.0:
+			
+            for accptor in res.accpt_pos():
+                if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz(accptor)).norm() < 3.5:
+                    # If the polar atom is from the backbone then check that the X-H...Y angle is close to linear.
+                    # It is assumed that polar backbone H is only attached to backbone N
+                    if res.atom_is_backbone(accptor):
+                        print("infos hscores for target atom:",target_atom,res.seqpos(), target_atom, res.atom_name(accptor), get_angle(res.xyz(1), res.xyz(accptor), pose.residue(lig_seqpos).xyz(target_atom)))
+                        """"if get_angle(res.xyz("N"), res.xyz(accptor), pose.residue(lig_seqpos).xyz(target_atom)) < 140.0:
+                            continue""""
+                    HBond_res += 1
+                    #break
     return HBond_res
 
 """
@@ -262,7 +287,19 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     else:
         df_scores.at[i, 'binder_hbond'] = False
     print("h_scores:",df_scores)
+    
+    # also find the hbinds where the ligand is the donor
+    
+    at_list=list(("H6","H9","H10", "H11"))
+    for n in at_list:
+        df_scores.at[i, f"{n}_hbond"] = find_hbonds_to_ligand_h(pose, pose.size(), n) # this function Counts how many Hbond contacts input atom has with the protein.
+        # the target atoms have to be adapted to the ligand
 
+    if any([df_scores.at[i, x] > 0.0 for x in ['H6_hbond','H9_hbond','H10_hbond', 'H11_hbond']]):
+        df_scores.at[i, 'binder_hbond_acc'] = True
+    else:
+        df_scores.at[i, 'binder_hbond_acc'] = False
+    print("h_scores:",df_scores)
     # or with bindcraft's scoring:---------------------------------------------------------------------
     # create a pose with just ligand and binder 
     """ might not be necessary
@@ -270,7 +307,7 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     binder_start = pose.conformation().chain_begin(2)
     pyrosetta.rosetta.core.pose.append_subpose_to_pose(ligand_pose, pose_bc, binder_start, pose_bc.size(), 1) # targetpose, source pose, start source, stop source, start target, /!\ residues are 1 indexed in pyrosetta
     """
-    from pyrosetta.rosetta.protocols.analysis import InterfaceAnalyzerMover
+    """from pyrosetta.rosetta.protocols.analysis import InterfaceAnalyzerMover
     # analyze interface hbonds
     iam = InterfaceAnalyzerMover()
     iam.set_interface("F_B")
@@ -309,7 +346,7 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     interface_sc = interfacescore.sc_value # shape complementarity
     #interface_interface_hbonds = interfacescore.interface_hbonds # number of interface H-bonds
     df_scores.at[i, 'bc_sc_lig.enz_binder'] = interface_sc
-    # test the other hbond function
+    # test the other hbond function"""
     """
     h_list=list(("H6","H9","H10", "H11")) 
     for h in h_list:
