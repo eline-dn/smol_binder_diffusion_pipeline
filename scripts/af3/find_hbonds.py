@@ -247,10 +247,10 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     ligand_pose = pyrosetta.rosetta.core.pose.Pose()
     pyrosetta.rosetta.core.pose.append_subpose_to_pose(ligand_pose, pose, pose.size(), pose.size(), 1)
     # restrict to ligand and binder interface:
-    pose_bc = pyrosetta.rosetta.core.pose.Pose()
+    """pose_bc = pyrosetta.rosetta.core.pose.Pose()
     binder_start = pose.conformation().chain_begin(2)
     pyrosetta.rosetta.core.pose.append_subpose_to_pose(pose_bc, pose, binder_start, pose.size(), 1) # targetpose, source pose, start source, stop source, start target, /!\ residues are 1 indexed in pyrosetta
-    
+    """
     # we will look for these atoms: 
     at_list=list(("O1", "O2","N1","O3", "O5", "O4"))
     for n in at_list:
