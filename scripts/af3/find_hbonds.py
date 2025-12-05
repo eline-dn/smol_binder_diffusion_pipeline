@@ -83,8 +83,8 @@ def find_hbonds_to_ligand_h(pose, lig_seqpos, target_atom):
                     # It is assumed that polar backbone H is only attached to backbone N
                     if res.atom_is_backbone(accptor):
                         print("infos hscores for target atom:",target_atom,res.seqpos(), target_atom, res.atom_name(accptor), get_angle(res.xyz(1), res.xyz(accptor), pose.residue(lig_seqpos).xyz(target_atom)))
-                        """"if get_angle(res.xyz("N"), res.xyz(accptor), pose.residue(lig_seqpos).xyz(target_atom)) < 140.0:
-                            continue""""
+                        """if get_angle(res.xyz("N"), res.xyz(accptor), pose.residue(lig_seqpos).xyz(target_atom)) < 140.0:
+                            continue"""
                     HBond_res += 1
                     #break
     return HBond_res
