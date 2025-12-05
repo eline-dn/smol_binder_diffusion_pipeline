@@ -61,7 +61,7 @@ def find_hbonds_to_residue_atom(pose, lig_seqpos, target_atom): # the one actual
                         if get_angle(res.xyz("N"), res.xyz(polar_H), pose.residue(lig_seqpos).xyz(target_atom)) < 140.0:
                             continue
                     HBond_res += 1
-                    #break
+                    break
     return HBond_res
 
 def find_hbonds_to_ligand_h(pose, lig_seqpos, target_atom): 
@@ -86,7 +86,7 @@ def find_hbonds_to_ligand_h(pose, lig_seqpos, target_atom):
                         """if get_angle(res.xyz("N"), res.xyz(accptor), pose.residue(lig_seqpos).xyz(target_atom)) < 140.0:
                             continue"""
                     HBond_res += 1
-                    #break
+                    break
     return HBond_res
 
 """
