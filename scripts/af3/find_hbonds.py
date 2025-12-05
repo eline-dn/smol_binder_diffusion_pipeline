@@ -53,7 +53,7 @@ def find_hbonds_to_residue_atom(pose, lig_seqpos, target_atom): # the one actual
             continue
         if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz('CA')).norm() < 10.0:
             for polar_H in res.Hpos_polar():
-                if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz(polar_H)).norm() < 2.5:
+                if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz(polar_H)).norm() < 3.5:
                     # If the polar atom is from the backbone then check that the X-H...Y angle is close to linear.
                     # It is assumed that polar backbone H is only attached to backbone N
                     if res.atom_is_backbone(polar_H):
@@ -254,7 +254,7 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     # we will look for these atoms: 
     at_list=list(("O1", "O2","N1","O3", "O5", "O4"))
     for n in at_list:
-        df_scores.at[i, f"{n}_hbond"] = find_hbonds_to_residue_atom(pose_bc, pose_bc.size(), n) # this function Counts how many Hbond contacts input atom has with the protein.
+        df_scores.at[i, f"{n}_hbond"] = find_hbonds_to_residue_atom(pose, pose.size(), n) # this function Counts how many Hbond contacts input atom has with the protein.
         # the target atoms have to be adapted to the ligand
 
     if any([df_scores.at[i, x] > 0.0 for x in ['N1_hbond','O1_hbond','O2_hbond', 'O3_hbond','O5_hbond','O4_hbond']]):
