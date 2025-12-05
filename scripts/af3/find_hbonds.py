@@ -49,6 +49,8 @@ def find_hbonds_to_residue_atom(pose, lig_seqpos, target_atom): # the one actual
     for res in pose.residues:
         if res.seqpos() == lig_seqpos or res.is_ligand():
             break
+        if pose.pdb_info().chain(res.seqpos())!= 2: # if the residue isn't in binder chain
+            continue
         if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz('CA')).norm() < 10.0:
             for polar_H in res.Hpos_polar():
                 if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz(polar_H)).norm() < 2.5:
