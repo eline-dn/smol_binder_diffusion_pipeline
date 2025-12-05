@@ -53,7 +53,7 @@ def find_hbonds_to_residue_atom(pose, lig_seqpos, target_atom): # the one actual
             continue"""
         if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz('CA')).norm() < 10.0:
             for polar_H in res.Hpos_polar():
-                if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz(polar_H)).norm() < 3.5:
+                if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz(polar_H)).norm() < 2.5:
                     # If the polar atom is from the backbone then check that the X-H...Y angle is close to linear.
                     # It is assumed that polar backbone H is only attached to backbone N
                     if res.atom_is_backbone(polar_H):
@@ -78,7 +78,7 @@ def find_hbonds_to_ligand_h(pose, lig_seqpos, target_atom):
         if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz('CA')).norm() < 10.0:
 			
             for accptor in res.accpt_pos():
-                if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz(accptor)).norm() < 3.5:
+                if (pose.residue(lig_seqpos).xyz(target_atom) - res.xyz(accptor)).norm() < 2.5:
                     # If the polar atom is from the backbone then check that the X-H...Y angle is close to linear.
                     # It is assumed that polar backbone H is only attached to backbone N
                     if res.atom_is_backbone(accptor):
