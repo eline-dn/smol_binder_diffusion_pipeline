@@ -96,11 +96,15 @@ def find_rosetta_hbonds(pose,lig_seqpos):
 	res["ap"]=filter.apply(pose, 1)
 	res["comp"]=filter.compute(pose)
 	res["score"]=filter.score(pose)
-
+	"""
 	from pyrosetta.rosetta.core.scoring.hbonds import HBondSet
 	hbset = HBondSet()
 	hbset.setup_for_residue_pair_energies(pose, False)
-	hbonds = hbset.atom_hbonds_all(AtomID(atom_index, lig_seqpos))
+	atom_id = AtomID(lig_res.atom_index(atom_name), lig_idx)
+
+    # --- 3. Find all H-bonds involving this atom ----------------
+    hbonds = hbset.atom_hbonds_all(atom_id)
+	hbonds = hbset.atom_hbonds_all(AtomID(atom_index, lig_seqpos))"""
 	res["hbonds"]=hbonds
 return(res)
 
@@ -147,7 +151,7 @@ def find_hbonds_ligand_atom_to_chainB(pose, lig_idx, atom_name="A1", target_chai
     lig_res = pose.residue(lig_idx)
     if not lig_res.has(atom_name):
         raise ValueError(f"Ligand residue {lig_idx} has no atom named '{atom_name}'")
-
+	from pyrosetta.rosetta.core.id import AtomID
     atom_id = AtomID(lig_res.atom_index(atom_name), lig_idx)
 
     # --- 3. Find all H-bonds involving this atom ----------------
