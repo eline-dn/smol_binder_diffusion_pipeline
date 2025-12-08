@@ -265,7 +265,7 @@ assert os.path.exists(DAB), "Please compile DAlphaBall.gcc and manually provide 
 pyr.init(f"{extra_res_fa} -dalphaball {DAB} -beta_nov16 -run:preserve_header -mute all ")
         # f"-multithreading false -multithreading:total_threads {NPROC} -multithreading:interaction_graph_threads {NPROC}")
 df_scores = pd.DataFrame()
-
+selected_df=pd.read_csv("selected2_binder_all_metrics_df.csv")
 for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we convert to pdb for pyrosetta
     structure = CIF_parser.get_structure("x", INPUT_PDB)
     old_id = "FUN"
@@ -295,6 +295,7 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     binder_start = pose.conformation().chain_begin(2)
     pyrosetta.rosetta.core.pose.append_subpose_to_pose(pose_bc, pose, binder_start, pose.size(), 1) # targetpose, source pose, start source, stop source, start target, /!\ residues are 1 indexed in pyrosetta
     """
+	"""
     # we will look for these atoms: 
     at_list=list(("O1", "O2","N1","O3", "O5", "O4"))
     for n in at_list:
@@ -324,7 +325,7 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
 	df=pd.df(res)
 	print(res)
 	df.to_csv("test_h.csv", "a")
-
+	"""
 
     # or with bindcraft's scoring:---------------------------------------------------------------------
     # create a pose with just ligand and binder 
@@ -395,10 +396,12 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     sc.selector2(binder_sel)
     df_scores.at[i, "sc"] = sc.score(pose)
     df_scores.at[i,"cif_path"]=INPUT_PDB
+	id_index=df['id']==INPUT_PDB.replace(".cif", "")
+	selected_df.loc[id_index, "sc"] = sc.score(pose)
     #see also: bindcraft's score_interface function in pyrosetta_utils.py
     #interfacescore = iam.get_all_data()
     #interface_sc = interfacescore.sc_value # shape complementarity
     #interface_interface_hbonds = interfacescore.interface_hbonds # number of interface H-bonds
 
 df_scores.to_csv("h_scores.csv")
-
+selected_df.to_csv("selected_scores.csv")
