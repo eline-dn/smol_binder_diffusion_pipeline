@@ -27,7 +27,10 @@ subset = df_clean[df_clean["hb_count"] >= 1].sort_values(by="sc", ascending=Fals
 subset.to_csv("top_hb_scores.csv")
 os.makedirs("final_select", exist_ok=True)
 import shutil
-for pdb in subset["complex_path"]:
+
+for id in subset["id"]:
+  cif=id + "cif"
+  shutil.copy(cif, os.path.join("final_select",cif))
 
 
   
