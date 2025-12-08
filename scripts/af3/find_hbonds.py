@@ -397,7 +397,7 @@ for i,INPUT_PDB in enumerate(args.pdb): # actually some mmcif files that we conv
     df_scores.at[i, "sc"] = sc.score(pose)
     df_scores.at[i,"cif_path"]=INPUT_PDB
 	id_index=df['id']==INPUT_PDB.replace(".cif", "")
-	selected_df.loc[id_index, "sc"] = sc.score(pose)
+	selected_df.at[id_index, "sc"] = sc.score(pose)
     #see also: bindcraft's score_interface function in pyrosetta_utils.py
     #interfacescore = iam.get_all_data()
     #interface_sc = interfacescore.sc_value # shape complementarity
