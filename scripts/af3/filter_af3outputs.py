@@ -253,9 +253,18 @@ def extract_filtered_binders(filtered_df, source, dest):
 
   str_binders=''
   for pdb_path in filtered_df[source]:
+    #filename = os.path.basename(pdb_path)
+    #out_path = os.path.join(dest, filename)
+    #name, ext = os.path.splitext(filename)
+    """if os.path.exists(outpath):
+        newname=name+
+        newpath=os.path.joint(dest,newname)"""
+    id_index=filtered_df['complex_path']==pdb_path
+    name=filtered_df.loc[id_index, "id"]+".cif"
+    
     str_binders+=f"{pdb_path} "
     # also copy the relevant pdbs to a filtered_binders folder:
-    shutil.copy(pdb_path, dest)
+    shutil.copy(pdb_path, os.path.join(dest,name))
 
   print(str_binders)
 
