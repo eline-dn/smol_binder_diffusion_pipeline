@@ -252,6 +252,7 @@ def extract_filtered_binders(filtered_df, source, dest):
   print(f"Filters on specific reprediction scores gave {len(filtered_df['id'])} binders: {filtered_df['id']}")
 
   str_binders=''
+  filtered_df= filtered_df.drop_duplicates()
   for pdb_path in filtered_df[source]:
     #filename = os.path.basename(pdb_path)
     #out_path = os.path.join(dest, filename)
@@ -260,8 +261,9 @@ def extract_filtered_binders(filtered_df, source, dest):
         newname=name+
         newpath=os.path.joint(dest,newname)"""
     id_index=filtered_df['complex_path']==pdb_path
-    name=filtered_df.loc[id_index, "id"]+".cif"
-    
+    name = filtered_df.loc[id_index, "id"].iloc[0]  # extract scalar
+    name = f"{name}.cif"
+    print(name)
     str_binders+=f"{pdb_path} "
     # also copy the relevant pdbs to a filtered_binders folder:
     shutil.copy(pdb_path, os.path.join(dest,name))
