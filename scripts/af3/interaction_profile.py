@@ -25,12 +25,23 @@ df_clean.to_csv("selected_scores.csv", index=False)
 
 subset = df_clean[df_clean["hb_count"] >= 1].sort_values(by="sc", ascending=False)
 subset.to_csv("top_hb_scores.csv")
-os.makedirs("final_select", exist_ok=True)
+
 import shutil
 
+df_clean=pd.read_csv("selected_scores.csv")
+os.makedirs("sc_cutoff", exist_ok=True)
+subset = df_clean[df_clean["sc"] >= 0.6].sort_values(by="sc", ascending=False)
 for id in subset["id"]:
-  cif=id + "cif"
-  shutil.copy(cif, os.path.join("final_select",cif))
+  cif=id + ".cif"
+  shutil.copy(cif, os.path.join("sc_cutoff",cif))
+subset.to_csv("sc_cutoff/scores.csv")
 
+
+os.makedirs("hb_cutoff", exist_ok=True)
+subset = df_clean[(df_clean["hb_count"] >= 1) & (df_clean["sc"] >= 0.6)].sort_values(by="sc", ascending=False)
+for id in subset["id"]:
+  cif=id + ".cif"
+  shutil.copy(cif, os.path.join("hb_cutoff",cif))
+subset.to_csv("hb_cutoff/scores.csv")
 
   
