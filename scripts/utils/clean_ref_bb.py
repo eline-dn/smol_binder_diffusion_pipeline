@@ -16,7 +16,7 @@ from Bio.PDB import StructureBuilder
 from Bio.PDB import PDBParser, Selection
 
 """test
-python /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/af2/repredict_w_templateBC.py --complex_pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/*... --outdir 
+python /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/af2/repredict_w_templateBC.py --complex_pdb /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/1_proteinmpnn/backbones/*... --outdir """
 
 import argparse
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
