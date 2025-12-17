@@ -21,7 +21,7 @@ python /work/lpdi/users/eline/smol_binder_diffusion_pipeline/scripts/af2/repredi
 
 import argparse
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--complex_pdb', type=str, required=True, help=' complex pdb file name to extract the sequence from and use as a template')
+parser.add_argument('--complex_pdb', type=str,  nargs="+", required=True, help=' complex pdb file list to clean and use as a reference')
 parser.add_argument('--outdir', type=str, required=True, help=' output directory for the cleaned pdb')
 args = parser.parse_args()
 
@@ -92,68 +92,71 @@ MODRES = {'MSE':'MET','MLY':'LYS','FME':'MET','HYP':'PRO',
 
 #---------------------------------------------
 outdir=args.outdir
-complex_pdb=args.complex_pdb # needs to be split in order to separate binder from target (change chain label for binder residues in pMPNN output)
-design_name=os.path.basename(complex_pdb).replace(".pdb", "")
-# binder residues positions:
-from Bio.PDB import PDBParser
-parser = PDBParser(QUIET=True)
-structure = parser.get_structure("x", complex_pdb)
-model = structure[0]             # first model
-chain = model["A"]               # chain A
-# count only standard residues
-from Bio.PDB.Polypeptide import is_aa
-three_to_one = {
-    "ALA":"A","CYS":"C","ASP":"D","GLU":"E","PHE":"F","GLY":"G","HIS":"H","ILE":"I",
-    "LYS":"K","LEU":"L","MET":"M","ASN":"N","PRO":"P","GLN":"Q","ARG":"R","SER":"S",
-    "THR":"T","VAL":"V","TRP":"W","TYR":"Y",
-    # common variants
-    "MSE":"M",  # Selenomethionine
-}
-residues = [res for res in chain.get_residues() if is_aa(res, standard=True)]
-#print("residues:", residues)
-print("len residues:", len(residues))
-# extract/trim the binder sequence
-binder_length=len(residues)-256
-print("binder len:", binder_length)
+complex_pdbs=args.complex_pdb # needs to be split in order to separate binder from target (change chain label for binder residues in pMPNN output)
 
-from Bio.PDB import PDBIO, Chain
-from Bio.PDB.Polypeptide import is_aa
-# change chain id for binder residues (from A to B) and for ligand atoms: from B to L 
-# ligand:
-structure=change_chain_id(structure=structure,model_id=0, old_id="B", new_id="L", old_resname=None, new_resname=None)
-#binder:
-for model in structure:
-    # Retrieve chain A (binder assumed to be first part)
-    model = structure[0]             # first model
-    chain_A = model["A"] 
-    lig_chain=model["B"]
-    
-    residues_A = list(chain_A.get_residues())
-    #print("res A:", residues_A)
-    if binder_length > len(residues_A):
-        raise ValueError("binder_length exceeds number of residues in chain A")
-    # Create new chain B
-    chain_B = Chain.Chain("B")
-    count=0
-    # Transfer the binder residues into chain B
-    for i, residue in enumerate(residues_A):
-        if not is_aa(residue, standard=False):
-            continue
-        if i < binder_length:
-            # Remove from chain A
-            chain_A.detach_child(residue.id)
-            # Add to chain B
-            chain_B.add(residue)
-            count+=1
-    # Add new chain B to the model
-    model.add(chain_B)
-    print("len chain B:",count)
+for complex_pdb in complex_pdbs:
+	design_name=os.path.basename(complex_pdb).replace(".pdb", "")
+	# binder residues positions:
+	from Bio.PDB import PDBParser
+	parser = PDBParser(QUIET=True)
+	structure = parser.get_structure("x", complex_pdb)
+	model = structure[0]             # first model
+	chain = model["A"]               # chain A
+	# count only standard residues
+	from Bio.PDB.Polypeptide import is_aa
+	three_to_one = {
+	    "ALA":"A","CYS":"C","ASP":"D","GLU":"E","PHE":"F","GLY":"G","HIS":"H","ILE":"I",
+	    "LYS":"K","LEU":"L","MET":"M","ASN":"N","PRO":"P","GLN":"Q","ARG":"R","SER":"S",
+	    "THR":"T","VAL":"V","TRP":"W","TYR":"Y",
+	    # common variants
+	    "MSE":"M",  # Selenomethionine
+	}
+	residues = [res for res in chain.get_residues() if is_aa(res, standard=True)]
+	#print("residues:", residues)
+	print("len residues:", len(residues))
+	# extract/trim the binder sequence
+	binder_length=len(residues)-256
+	print("binder len:", binder_length)
+	
+	from Bio.PDB import PDBIO, Chain
+	from Bio.PDB.Polypeptide import is_aa
+	# change chain id for binder residues (from A to B) and for ligand atoms: from B to L 
+	# ligand:
+	structure=change_chain_id(structure=structure,model_id=0, old_id="B", new_id="L", old_resname=None, new_resname=None)
+	#binder:
+	for model in structure:
+	    # Retrieve chain A (binder assumed to be first part)
+	    model = structure[0]             # first model
+	    chain_A = model["A"] 
+	    lig_chain=model["B"]
+	    
+	    residues_A = list(chain_A.get_residues())
+	    #print("res A:", residues_A)
+	    if binder_length > len(residues_A):
+	        raise ValueError("binder_length exceeds number of residues in chain A")
+	    # Create new chain B
+	    chain_B = Chain.Chain("B")
+	    count=0
+	    # Transfer the binder residues into chain B
+	    for i, residue in enumerate(residues_A):
+	        if not is_aa(residue, standard=False):
+	            continue
+	        if i < binder_length:
+	            # Remove from chain A
+	            chain_A.detach_child(residue.id)
+	            # Add to chain B
+	            chain_B.add(residue)
+	            count+=1
+	    # Add new chain B to the model
+	    model.add(chain_B)
+	    print("len chain B:",count)
+	
+	
+	# Save modified structure
+	path=os.path.join(outdir, design_name + ".pdb")
+	
+	io = PDBIO()
+	io.set_structure(structure)
+	io.save(path)
 
-
-# Save modified structure
-path=os.path.join(outdir, design_name + ".pdb")
-
-io = PDBIO()
-io.set_structure(structure)
-io.save(path)
-
+print("Done cleaning pdbs")
