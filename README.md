@@ -29,8 +29,43 @@ the main differences with the original pipeline is the ability to run it in my l
 Running these steps smoothly is currently WIP with 'run_phase1.py', ....
 
 
+## Running the pipeline 
 
+1) Backbone design with RF diffusion all atoms:
+Running with different combinations of inference.deterministic, inference.ppi_design and inference.scaffold_guided combinations
 
+```sbatch nd[1-5]run_inference.slurm```
+
+2) Sequence design with protein MPNN
+```python 1_pMPNN.py```
+Wait for the launched slurm script to finish. Sequence fasta files are in the './1_protein_mpnn/seqs' folder, backbones with threaded sequence in './1_protein_mpnn/backbones'
+
+3) Filtering for backbone designability with AF2
+
+The sequences from binders only are extracted from the fasta files and repredicted with AF2 in single sequence mode:
+
+Run ```2.1_prep_AF2_inputs.py```
+Add 
+```
+module load gcc/13.2.0
+module load cuda/12.4.1
+```
+at the begining of the produced script and ```sbatch submit_af2.sh```
+
+The outputs are then filtered to check if the sequence folds into the intended backbone: 
+TO DO verify and mb re-run this step (2.2_filter_af2_out.py) ? check how references are mapped to repredictions in /scripts/utils/analyze_af2.py and if the param argument is necessary
+
+good binders in {AF2_DIR}/good/ 
+
+4) Pocket and sequence redesign with ligand MPNN
+
+=> with simple_redesign.py in run_alt_phase2.py
+To DO: re-run this step with appropriate names and save pdb files by threading the new sequence on the pMPNN backbones, splitting them into chain A and B and renaming the ligand chain to L 
+=> then use as binder refs for the scoring pipeline 
+
+5) Binder scoring pipeline
+
+See https://github.com/eline-dn/CID_scoring 
 
 
 
@@ -58,10 +93,6 @@ and follow its instructions.<br>
 Make sure to provide a full path to the checkpoint file in this configuration file:<br>
 `rf_diffusion_all_atom/config/inference/aa.yaml`
 
-#### RFjoint inpainting (proteininpainting)
-(Optional) Download RFjoint Inpainting here: https://github.com/RosettaCommons/RFDesign
-
-Inpainting is used to further resample/diversify diffusion outputs, and it may also increase AF2 success rates.
 
 ### Python or Apptainer image
 This pipeline consists of multiple different Python scripts using a different Python modules - most notably PyTorch, PyRosetta, Jax, Jaxlib, Tensorflow, Prody, OpenBabel.<br>
@@ -76,8 +107,4 @@ A minimal conda environment for AlphaFold2 is set up as follows:<br>
 `conda env create -f envs/mlfold.yml`
 
 
-### Executing the pipeline
-Please adjust the the critical paths defined in the first couple of cells of the notebook based on your system configuration. Other than that, the pipeline is executed by running the cells and waiting for them to finish.
 
-Certain tasks are configured to run as Slurm jobs on a compute cluster. The Slurm script setup is handled in `scripts/utils/utils.py` by the function `create_slurm_submit_script()`.
-Please modify this script, and any references to it in the notebook, based on how your system accepts jobs.
