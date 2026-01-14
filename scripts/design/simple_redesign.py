@@ -83,6 +83,18 @@ assert os.path.exists(DAB), "Please compile DAlphaBall.gcc and manually provide 
 pyr.init(f"{extra_res_fa} -dalphaball {DAB} -beta_nov16 -run:preserve_header -mute all "
          f"-multithreading true -multithreading:total_threads {NPROC} -multithreading:interaction_graph_threads {NPROC}")
 
+
+def thread_seq_to_pose(pose, sequence):
+    pose2 = pose.clone()
+    for i, r in enumerate(sequence):
+        if pose.residue(i+1).name1() == r:
+            continue
+        mutres = pyrosetta.rosetta.protocols.simple_moves.MutateResidue()
+        mutres.set_target(i+1)
+        mutres.set_res_name(aa_1_3[r])
+        mutres.apply(pose2)
+    return pose2
+  
 print("Setting up MPNN API")
 mpnnrunner = MPNNRunner(model_type="ligand_mpnn", ligand_mpnn_use_side_chain_context=True)  # starting with default checkpoint
 
@@ -142,8 +154,13 @@ for design_cutoff in design_cutoffs:
       mpnn_out = mpnnrunner.run(inp)
       with open("sequences.fasta", "a") as f:
         for n, seq in enumerate(mpnn_out["generated_sequences"]):
+          #write sequence to fasta file
           output_name = f"{pdb_name}_lTp{temperature}_dcut{design_cutoff}_seq{n}"
           f.write(f">{output_name}\n{seq}\n")
+          # thread sequences to the pdb poses and save as pdb
+          input_pose = pyrosetta.pose_from_file(INPUT_PDB)
+          pose_threaded=thread_seq_to_pose(input_pose.clone(), seq)
+          pose_threaded.dump_pdb(f"{output_name}.pdb")
 
           
           
