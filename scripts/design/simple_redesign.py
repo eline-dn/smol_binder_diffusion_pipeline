@@ -24,7 +24,9 @@ import copy
 import time
 import scipy.spatial
 import io
-
+from pyrosetta import Pose
+from pyrosetta.rosetta.core.pose import append_pose_to_pose
+from pyrosetta.rosetta.core.pose import PDBInfo
 
 import setup_fixed_positions_around_target
 
@@ -167,8 +169,66 @@ for design_cutoff in design_cutoffs:
           # thread sequences to the pdb poses and save as pdb
           input_pose = pyrosetta.pose_from_file(INPUT_PDB)
           pose_threaded=thread_seq_to_pose(input_pose.clone(), seq)
-          pose_threaded.dump_pdb(f"{output_name}.pdb")
+
+          # split by chain (protein, ligand)
+          chains = pose_threaded.split_by_chain()
+          protein_pose = chains[1]
+          ligand_pose  = chains[2]
+      
+          # -----------------------------
+          # split protein chain
+          # -----------------------------
+          protein_end = pose_threaded.chain_end(1)
+          protein_length = protein_end - pose_threaded.chain_begin(1) + 1
+          
+          if protein_length <= 256:
+              raise ValueError("Protein chain shorter than or equal to 256 residues")
+          
+          SPLIT_INDEX = protein_end - 256
+
+          protein_split_index = SPLIT_INDEX 
+      
+          pose_B = Pose()
+          pose_A = Pose()
+      
+          # build chain B (1 .. split_index)
+          pose_B.append_residue_by_bond(protein_pose.residue(1))
+          for i in range(2, protein_split_index + 1):
+              pose_B.append_residue_by_bond(protein_pose.residue(i))
+      
+          # build chain A (split_index+1 .. end)
+          pose_A.append_residue_by_bond(protein_pose.residue(protein_split_index + 1))
+          for i in range(protein_split_index + 2,
+                         protein_pose.total_residue() + 1):
+              pose_A.append_residue_by_bond(protein_pose.residue(i))
+      
+          # -----------------------------
+          # set chain IDs explicitly
+          # -----------------------------
+      
+          def set_chain_id(pose, chain_id):
+              if pose.pdb_info() is None:
+                  pose.pdb_info(PDBInfo(pose))
+              pdb = pose.pdb_info()
+              for i in range(1, pose.total_residue() + 1):
+                  pdb.set_resinfo(i, chain_id, i)
+      
+          set_chain_id(pose_B, 'B')
+          set_chain_id(pose_A, 'A')
+          set_chain_id(ligand_pose, 'L')
+      
+          # -----------------------------
+          # assemble final pose
+          # -----------------------------
+      
+          new_pose = Pose()
+          append_pose_to_pose(new_pose, pose_B, new_chain=True)
+          append_pose_to_pose(new_pose, pose_A, new_chain=True)
+          append_pose_to_pose(new_pose, ligand_pose, new_chain=True)
+      
+
+          new_pose.dump_pdb(f"{output_name}.pdb")
 
           
           
-print(f"Generated 3 sequences for binder {pdb_name} ")#with temperature {"and".join(temperatures)}, and at redesign cutoffs {"and".join(args.redesign_d_cutoff)} ")
+print(f"Generated 2 sequences for binder {pdb_name} ")#with temperature {"and".join(temperatures)}, and at redesign cutoffs {"and".join(args.redesign_d_cutoff)} ")
