@@ -83,6 +83,12 @@ assert os.path.exists(DAB), "Please compile DAlphaBall.gcc and manually provide 
 pyr.init(f"{extra_res_fa} -dalphaball {DAB} -beta_nov16 -run:preserve_header -mute all "
          f"-multithreading true -multithreading:total_threads {NPROC} -multithreading:interaction_graph_threads {NPROC}")
 
+alpha_1 = list("ARNDCQEGHILKMFPSTWYV-")
+alpha_3 = ['ALA','ARG','ASN','ASP','CYS','GLN','GLU','GLY','HIS','ILE',
+           'LEU','LYS','MET','PHE','PRO','SER','THR','TRP','TYR','VAL','GAP']
+
+aa_1_3 = {a:b for a,b in zip(alpha_1,alpha_3)}
+aa_3_1 = {b:a for a,b in zip(alpha_1,alpha_3)}
 
 def thread_seq_to_pose(pose, sequence):
     pose2 = pose.clone()
@@ -155,6 +161,7 @@ for design_cutoff in design_cutoffs:
       with open("sequences.fasta", "a") as f:
         for n, seq in enumerate(mpnn_out["generated_sequences"]):
           #write sequence to fasta file
+          print(seq)
           output_name = f"{pdb_name}_lTp{temperature}_dcut{design_cutoff}_seq{n}"
           f.write(f">{output_name}\n{seq}\n")
           # thread sequences to the pdb poses and save as pdb
