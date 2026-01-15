@@ -222,9 +222,31 @@ for design_cutoff in design_cutoffs:
           # -----------------------------
       
           new_pose = Pose()
+          #append_pose_to_pose(new_pose, pose_A, new_chain=True)
           append_pose_to_pose(new_pose, pose_B, new_chain=True)
+          pose_B_end = new_pose.total_residue()
+          
           append_pose_to_pose(new_pose, pose_A, new_chain=True)
+          pose_A_end = new_pose.total_residue()
+          
           append_pose_to_pose(new_pose, ligand_pose, new_chain=True)
+          
+          # Reset chain IDs on the final assembled pose
+          if new_pose.pdb_info() is None:
+              new_pose.pdb_info(PDBInfo(new_pose))
+          pdb = new_pose.pdb_info()
+          
+          # Set chain B (residues 1 to pose_B_end)
+          for i in range(1, pose_B_end + 1):
+              pdb.set_resinfo(i, 'B', i)
+          
+          # Set chain A (residues pose_B_end+1 to pose_A_end)
+          for i in range(pose_B_end + 1, pose_A_end + 1):
+              pdb.set_resinfo(i, 'A', i - pose_B_end)
+          
+          # Set chain L (ligand, remaining residues)
+          for i in range(pose_A_end + 1, new_pose.total_residue() + 1):
+              pdb.set_resinfo(i, 'L', i - pose_A_end)
       
 
           new_pose.dump_pdb(f"{output_name}.pdb")

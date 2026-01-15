@@ -109,6 +109,6 @@ utils.create_slurm_submit_script(filename=submit_script, name="3_design_ligMPNN"
                                       N_cores=2, gpu=True, partition="h100", time="30:00:00", email=EMAIL, array=len(commands_af2),
                                       array_commandfile=cmds_filename_af2, group=25)"""
 
-p = subprocess.Popen(['sbatch', submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-(output, err) = p.communicate()
+#p = subprocess.Popen(['sbatch', submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+#(output, err) = p.communicate()
 
