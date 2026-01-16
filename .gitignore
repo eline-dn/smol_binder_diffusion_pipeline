@@ -1,0 +1,25 @@
+ __pycache__/
+envs/mlfold.yml
+lib/LigandMPNN (untracked content)
+lib/alphafold (untracked content)
+scripts/design/ligandmpnn_pocket_design_nofilters.py
+scripts/utils/__pycache__/utils.cpython-310.pyc
+
+# Ignore output folders and files
+1Z9Yout/
+3DGQout/
+envs/mlfold2.yml
+input/
+ligandmpnn_env.yml
+scripts/af2/__pycache__/
+scripts/design/__pycache__/setup_fixed_positions_around_target.cpython-310.pyc
+scripts/design/__pycache__/setup_fixed_positions_around_target.cpython-311.pyc
+scripts/design/__pycache__/setup_fixed_positions_around_target.cpython-39.pyc
+scripts/design/scoring/__pycache__/FUN_scoring.cpython-311.pyc
+scripts/design/scoring/__pycache__/FUN_scoring_no_filters.cpython-311.pyc
+scripts/diffusion_analysis/utils/__pycache__/
+scripts/utils/__pycache__/design_utils.cpython-311.pyc
+scripts/utils/__pycache__/no_ligand_repack.cpython-311.pyc
+scripts/utils/__pycache__/scoring_utils.cpython-311.pyc
+scripts/utils/__pycache__/utils.cpython-311.pyc
+scripts/utils/__pycache__/utils.cpython-313.pyc
