@@ -95,6 +95,7 @@ if do["0_diffusion"]:
 # ----------------1: Running ProteinMPNN on diffused backbones ---------------------------------------------------
 #pdbs should be in /work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout/0_diffusion, ie in DIFFUSION_DIR
 #pattern = re.compile(r"t2_\d+_(2|[2-8]\d|89)\.pdb$")
+"""
 pattern = re.compile(r"t2_\d+_(1|[3-9]|1[0-9]|9[0-9]|1[0-4][0-9])\.pdb$")
 all_pdbs = glob.glob(f"{DIFFUSION_DIR}/t2_*.pdb")
 diffused_backbones_good = [f for f in all_pdbs if pattern.search(f)]
@@ -109,10 +110,11 @@ os.chdir(MPNN_DIR)
 
 
 
-if  do["1proteinmpnn"]:
+if  do["1proteinmpnn"]:"""
   """the creation of the mask dict from the trb file allow us to use pMPNN on the backbone pdb file from rf diff, only the binder will be redesigned.
   Parsing diffusion output TRB files to extract fixed motif residues.
   These residues will not be redesigned with proteinMPNN
+  """
   """
   mask_json_cmd = f"{PYTHON['general']} {SCRIPT_DIR}/scripts/design/make_maskdict_from_trb.py --out masked_pos.jsonl --trb"
   for d in diffused_backbones_good:
@@ -120,6 +122,8 @@ if  do["1proteinmpnn"]:
   
   p = subprocess.Popen(mask_json_cmd, shell=True)
   (output, err) = p.communicate()
+  """ #covered in 1_pMPNN.sh
+  
   assert os.path.exists("masked_pos.jsonl"), "Failed to create masked positions JSONL file"
   
   MPNN_temperatures = [0.1, 0.2, 0.3]

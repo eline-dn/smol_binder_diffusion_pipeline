@@ -24,7 +24,7 @@ Ours will be a bit different, in order to be able to design Chemically induced d
 
 
 The begining is quite similar to the initial pipeline.
-steps 0 to 2 are done with the python script run.py, slightly adapted from the ipynb file (do not run as it is, proceed step by step
+
 the main differences with the original pipeline is the ability to run it in my local env, and for the purpose of designing a binder to a target + small molecule (e.g. trimming of some of the diffusion and pMPNN reference files to filter the binders)
 Running these steps smoothly is currently WIP with 'run_phase1.py', ....
 
@@ -34,7 +34,7 @@ Running these steps smoothly is currently WIP with 'run_phase1.py', ....
 1) Backbone design with RF diffusion all atoms:
 Running with different combinations of inference.deterministic, inference.ppi_design and inference.scaffold_guided combinations
 
-```sbatch nd[1-5]run_inference.slurm```
+```sbatch 0_rf_diff.sh```
 
 2) Sequence design with protein MPNN
 ```python 1_pMPNN.py```
@@ -44,12 +44,13 @@ Wait for the launched slurm script to finish. Sequence fasta files are in the '.
 
 The sequences from binders only are extracted from the fasta files and repredicted with AF2 in single sequence mode:
 
-Run ```2.1_prep_AF2_inputs.py```
+Run ```2.1_prep_AF2_inputs.py``` to 
 Add 
 ```
 module load gcc/13.2.0
 module load cuda/12.4.1
 ```
+
 at the begining of the produced script and ```sbatch submit_af2.sh```
 
 The outputs are then filtered to check if the sequence folds into the intended backbone: 

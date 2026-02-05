@@ -5,7 +5,7 @@ Created on Tue Jan 25 2022
 
 @author: ikalvet
 """
-import sys, os
+import sys, os, glob
 sys.path = [x for x in sys.path if sys.base_exec_prefix in x] + [x for x in sys.path if sys.base_exec_prefix not in x]
 import pyrosetta as pyr
 import pyrosetta.rosetta
@@ -18,6 +18,8 @@ import queue
 import threading
 import multiprocessing
 import json
+import matplotlib.pyplot as plt 
+import seaborn as sns
 
 
 def reorder_df_columns(df):
@@ -167,6 +169,8 @@ def main():
     parser.add_argument('--posdict', type=str, help='A JSON file that defines per-chain residue numbers for pocket sidechain rmsd calculation for each reference structure.')
     parser.add_argument('--no_align', action="store_true", default=False, help='Calculates rmsd by Rosetta CA superimposition. Alternative (False) calculates rmsd by distance matrix difference')
     parser.add_argument('--out', type=str, default="scores.sc", help='Name of output scorefile')
+    parser.add_argument('--dir_filtered', type=str, default="good", help='Optionnal: Name of filtered pdb folder. will not be used if rsmd flag is not set.')
+    parser.add_argument('--rmsd', type=float, required=False, help="Optionnal: if you want to filter the binders, set the maximum binder RMSD to the reference pdb")
 
     args = parser.parse_args()
 
@@ -176,6 +180,7 @@ def main():
     no_align = args.no_align
     mpnn_naming = args.mpnn
     lddt_cutoff = args.lddt
+    rmsd_cutoff = args.rmsd
     pocket_rmsd = args.pocket
 
     pocket_df = pd.DataFrame()
@@ -416,6 +421,42 @@ def main():
         dump_scorefile(pocket_df, pocket_scorefile)
 
     dump_scorefile(scores, args.out)
+    # filtering the binders:
+    scores_af2 = pd.read_csv("scores.sc", sep="\s+", header=0)
+    scores_af2['lDDT'] = pd.to_numeric(scores_af2['lDDT'], errors='coerce')
+    scores_af2['rmsd']= pd.to_numeric(scores_af2['rmsd'], errors='coerce')
+
+    if rmsd_cutoff is not None:
+        dir_filtered=args.dir_filtered
+        os.makedirs(dir_filtered, exist_ok=True)
+        scores_af2_filtered=scores_af2[(scores_af2['lDDT'] >=lddt_cutoff) & (scores_af2['rmsd'] <= rmsd_cutoff)]
+        scores_af2["pass_filters"]=(scores_af2['lDDT'] >=lddt_cutoff) & (scores_af2['rmsd'] <= rmsd_cutoff)
+        # plotting our binder distribution:
+        plt.figure(figsize=(10, 5))
+        sns.scatterplot(data=scores_af2, x='plDDT', y='rmsd', hue=pass_filters)
+        plt.xlabel('plDDT')
+        plt.ylabel('rmsd')
+        plddt = lddt_cutoff
+        plt.axvline(x=plddt, ymin=0, ymax=1, color="black", linestyle="--")
+        rmsd = rmsd_cutoff
+        plt.axhline(
+            y=rmsd, xmin=0, xmax=1, color="black", linestyle="--"
+        )
+
+        plt.savefig(os.path.join(dir_filtered,"scatter_rmsd_plddt.png"))
+        plt.close()
+
+        ### Copying good predictions to a separate directory
+        if len(scores_af2_filtered) > 0:
+            print(f"Found {len(scores_af2_filtered)} binders passing thresholds, saving them in {dir_filtered}")
+            utils.dump_scorefile(scores_af2_filtered, os.path.join(dir_filtered,"filtered_scores.sc"))
+            good_af2_models = [row["Output_PDB"]+".pdb" for idx,row in scores_af2_filtered.iterrows()]
+            for pdb in good_af2_models:
+                copy2(f"{pdb}", os.path.join(dir_filtered, pdb))
+        else:
+            sys.exit("No good models to continue this pipeline with")
+
+
 
 if __name__ == "__main__":
     main()

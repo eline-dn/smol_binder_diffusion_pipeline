@@ -15,9 +15,9 @@ assert os.path.exists(SCRIPT_DIR)
 sys.path.append(SCRIPT_DIR + "/scripts/utils")
 import utils
 
-
+SCRIPT_DIR=sys.argv[1]
+WDIR=sys.argv[2]
 # SETUP-----------------------------------------------------
-proteinMPNN_script = f"{SCRIPT_DIR}/lib/LigandMPNN/run.py"  # from submodule
 CONDAPATH = "/work/lpdi/users/eline/miniconda3"  # edit this depending on where your Conda environments live
 PYTHON = {
     "diffusion": f"{CONDAPATH}/envs/diffusion/bin/python",
@@ -29,7 +29,6 @@ PYTHON = {
     }
 
 ### Path where the jobs will be run and outputs dumped
-WDIR = "/work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout"
 print(f"Working directory: {WDIR}")
 
 # Ligand information
@@ -42,6 +41,8 @@ MPNN_DIR = f"{WDIR}/1_proteinmpnn"
 AF2_DIR = f"{WDIR}/2_af2"
 DIFFUSION_DIR = f"{WDIR}/0_diffusion"
 good_af2_models = glob.glob(f"{AF2_DIR}/good/*.pdb") # these models only will be redesigned
+if len(good_af2_models)==0:
+    raise ValueError("good af2 models not found, check path")
 
 DESIGN_DIR_ligMPNN = f"{WDIR}/3_ligandMPNN"
 os.makedirs(DESIGN_DIR_ligMPNN, exist_ok=True)
@@ -76,7 +77,7 @@ from Bio.PDB import PDBParser
 # extracting the target's fixed residues
 parser = PDBParser(QUIET=True)
 commands_design = []
-cmds_filename_des = "commands_design"
+cmds_filename_des = "commands_ligMPNN"
 with open(cmds_filename_des, "w") as file:
     for pdb in good_pmpnn_bb:
         structure = parser.get_structure("x", f"{MPNN_DIR}/backbones/{pdb}")
@@ -99,16 +100,19 @@ print("Example design command:")
 print(commands_design[-1])
 print("Number of commands:")
 print(len(commands_design))
+
+"""
 ### Running design jobs with Slurm.
 submit_script = "submit_design.sh"
 utils.create_slurm_submit_script(filename=submit_script, name="3_design_ligMPNN", mem="4g", 
                                  N_cores=1, gpu=True, time="70:00:00", array=len(commands_design),
                                  array_commandfile=cmds_filename_des, partition="h100", group=75)
 
-"""utils.create_slurm_submit_script(filename=submit_script, name="2_af2", mem="6g",
+utils.create_slurm_submit_script(filename=submit_script, name="2_af2", mem="6g",
                                       N_cores=2, gpu=True, partition="h100", time="30:00:00", email=EMAIL, array=len(commands_af2),
                                       array_commandfile=cmds_filename_af2, group=25)"""
 
 #p = subprocess.Popen(['sbatch', submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 #(output, err) = p.communicate()
 
+"""

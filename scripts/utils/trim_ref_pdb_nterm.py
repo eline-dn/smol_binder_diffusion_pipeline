@@ -112,7 +112,7 @@ def extract_chain(input_pdb_path: str, output_pdb_path: str, chain_id: str):
 # print("Chain A saved to 'chain_A.pdb'")
 
 pdb_files=sys.argv[1] # path to the folder with the input/ reference pdb files, that we want to extract the binder structure from
-output_folder=sys.argv[2] # path to the folder where the trimmed pdb should be store (= binder structure references)
+output_folder=sys.argv[2] # path to the folder where the trimmed pdb should be stored (= binder structure references)
 
 for pdb in glob.glob(f"{pdb_files}/*.pdb"):
   out_path=os.path.join(output_folder, os.path.basename(pdb))

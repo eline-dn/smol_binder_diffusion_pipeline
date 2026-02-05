@@ -9,9 +9,13 @@ import time
 import importlib
 from shutil import copy2
 import Bio.PDB
+import random
+
 
 ### Path to this cloned GitHub repo:
-SCRIPT_DIR = "/work/lpdi/users/eline/smol_binder_diffusion_pipeline"  # edit this to the GitHub repo path. Throws an error by default.
+SCRIPT_DIR=sys.argv[1]
+WDIR=sys.argv[2]
+
 assert os.path.exists(SCRIPT_DIR)
 sys.path.append(SCRIPT_DIR + "/scripts/utils")
 import utils
@@ -28,9 +32,7 @@ PYTHON = {
     "general": f"{CONDAPATH}/envs/diffusion/bin/python",
 }
 
-### Path where the jobs will be run and outputs dumped
-WDIR = "/work/lpdi/users/eline/smol_binder_diffusion_pipeline/1Z9Yout"
-print(f"Working directory: {WDIR}")
+
 
 USE_GPU_for_AF2 = True
 DIFFUSION_DIR = f"{WDIR}/0_diffusion"
@@ -82,11 +84,12 @@ SEQUENCES_PER_AF2_JOB = 100  # GPU
 mpnn_fasta_split = utils.split_fasta_based_on_length(mpnn_fasta, SEQUENCES_PER_AF2_JOB, write_files=True)
 ## Setting up AlphaFold2 run
 AF2_recycles = 3
-AF2_models = "4"  # add other models to this string if needed, i.e. "3 4 5"
+#AF2_models = "4"  # add other models to this string if needed, i.e. "3 4 5"
 commands_af2 = []
 cmds_filename_af2 = "commands_af2"
 with open(cmds_filename_af2, "w") as file:
     for ff in glob.glob("*.fasta"):
+        AF2_models = random.choice([3, 4, 5])
         commands_af2.append(f"{PYTHON['af2']} {AF2_script} "
                           f"--af-nrecycles {AF2_recycles} --af-models {AF2_models} "
                           f"--fasta {ff} --scorefile {ff.replace('.fasta', '.csv')}\n")
@@ -97,9 +100,10 @@ print(commands_af2[-1])
 print("Number of AF2 commands:")
 print(len(commands_af2))
 
-
+"""
 submit_script = "submit_af2.sh"
 #if USE_GPU_for_AF2 is True:
 utils.create_slurm_submit_script(filename=submit_script, name="2_af2", mem="6g",
                                       N_cores=2, gpu=True, partition="h100", time="30:00:00", array=len(commands_af2),
                                       array_commandfile=cmds_filename_af2, group=25) ## don't forget to adjust group!
+"""

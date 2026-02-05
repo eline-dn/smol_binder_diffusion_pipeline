@@ -166,6 +166,7 @@ for design_cutoff in design_cutoffs:
           print(seq)
           output_name = f"{pdb_name}_lTp{temperature}_dcut{design_cutoff}_seq{n}"
           f.write(f">{output_name}\n{seq}\n")
+
           # thread sequences to the pdb poses and save as pdb
           input_pose = pyrosetta.pose_from_file(INPUT_PDB)
           pose_threaded=thread_seq_to_pose(input_pose.clone(), seq)
@@ -251,6 +252,4 @@ for design_cutoff in design_cutoffs:
 
           new_pose.dump_pdb(f"{output_name}.pdb")
 
-          
-          
-print(f"Generated 2 sequences for binder {pdb_name} ")#with temperature {"and".join(temperatures)}, and at redesign cutoffs {"and".join(args.redesign_d_cutoff)} ")
+print(f"Generated sequences for binder {pdb_name} ")#with temperature {"and".join(temperatures)}, and at redesign cutoffs {"and".join(args.redesign_d_cutoff)} ")
