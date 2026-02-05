@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=rfdiffusion_array
+#SBATCH --job-name=pmpnn_input
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -8,25 +8,25 @@
 #SBATCH --gres=gpu:1
 #SBATCH --mem=5gb
 #SBATCH --time=10:00:00
-#SBATCH --output=pmpnn_inputs_%A.log
+#SBATCH --output=log/pmpnn_inputs_%A.log
 
 
 WD="/work/lpdi/users/eline/smol_binder_diffusion_pipeline"
-OD="b2_1Z9Yout/"
+OD="b2_1Z9Yout"
 
 cd $WD
 
 
-DIFFUSION_DIR="$OD/0_diffusion/"
+DIFFUSION_DIR="$OD/0_diffusion"
 
 PYTHON="python"  #Python interpreter
 
-cd "$OD/1_proteinmpnn"
+cd "$OD/1_protein_mpnn"
 
 # generating masked_pos.jsonl
 $PYTHON "$WD/scripts/design/make_maskdict_from_trb.py" \
     --out masked_pos.jsonl \
-    --trb "$DIFFUSION_DIR/*.trb"
+    --trb $DIFFUSION_DIR/*.trb
 
 # check file existence
 if [ ! -f "masked_pos.jsonl" ]; then
@@ -42,7 +42,7 @@ find "$DIFFUSION_DIR" -maxdepth 1 -type f -name "*.pdb" -print0 | \
 
 # check file existence
 if [ ! -f "redesign_pdb.json" ]; then
-    echo "Erreur : Échec de la création du fichier masked_pos.jsonl !"
+    echo "Erreur : Échec de la création du fichier redesign_pdb.json !"
     exit 1
 fi
 

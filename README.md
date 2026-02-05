@@ -31,38 +31,64 @@ Running these steps smoothly is currently WIP with 'run_phase1.py', ....
 
 ## Running the pipeline 
 
+```
+mkdir b2_1Z9Yout/ # replace name with name of choice
+mkdir b2_1Z9Yout/0_diffusion/
+mkdir b2_1Z9Yout/1_protein_mpnn
+mkdir b2_1Z9Yout/2_af2
+mkdir b2_1Z9Yout/3_ligandMPNN
+```
+In all of the following scripts, replace ```$WD``` (path to github repo) and ```$OD``` by the correct absolute paths.
+
+
 1) Backbone design with RF diffusion all atoms:
 Running with different combinations of inference.deterministic, inference.ppi_design and inference.scaffold_guided combinations
 
 ```sbatch 0_rf_diff.sh```
+Also specify path to RFDiffusionAA repo in ```$RFAA``` and the target + ligand reference pdb in ```$ref_pdb```. 
 
 2) Sequence design with protein MPNN
-```python 1_pMPNN.py```
-Wait for the launched slurm script to finish. Sequence fasta files are in the './1_protein_mpnn/seqs' folder, backbones with threaded sequence in './1_protein_mpnn/backbones'
+```sbatch 1.1_pMPNN_inputs.sh```
+
+```sbatch 1.2_pMPNN.sh```
+
+Sequence fasta files are in the './1_protein_mpnn/seqs' folder, backbones with threaded sequence in './1_protein_mpnn/backbones'
 
 3) Filtering for backbone designability with AF2
 
 The sequences from binders only are extracted from the fasta files and repredicted with AF2 in single sequence mode:
 
-Run ```2.1_prep_AF2_inputs.py``` to 
-Add 
-```
-module load gcc/13.2.0
-module load cuda/12.4.1
-```
+/!\ write absolutes paths for OD and WD!
 
-at the begining of the produced script and ```sbatch submit_af2.sh```
+tips for the environment installation:
+sed -E 's/=[^=]+$//' envs/mlfold.yml > envs/mlfold_no_builds.yml
+conda env create -f envs/mlfold_no_builds.yml
+
+
+```sbatch 2.1_prep_af2_inputs.sh``` 
+
+and ```sbatch 2.2_submit_af2.sh``` 
+
+(here adjust group size and number of array depending on your ressources and the number of generated af2 commands)
+
+and ```sbatch 2.3_af2_filters.sh```
 
 The outputs are then filtered to check if the sequence folds into the intended backbone: 
-TO DO verify and mb re-run this step (2.2_filter_af2_out.py) ? check how references are mapped to repredictions in /scripts/utils/analyze_af2.py and if the param argument is necessary
 
-good binders in {AF2_DIR}/good/ 
+
+good binders in {AF2_DIR}/good/ by default
 
 4) Pocket and sequence redesign with ligand MPNN
 
+
+```sbatch 3.1_prep_inputs.sh```
+
+```sbatch 3.2_submit_ligMPNN.sh```
 => with simple_redesign.py in run_alt_phase2.py
 To DO: re-run this step with appropriate names and save pdb files by threading the new sequence on the pMPNN backbones, splitting them into chain A and B and renaming the ligand chain to L 
 => then use as binder refs for the scoring pipeline 
+
+
 
 5) Binder scoring pipeline
 

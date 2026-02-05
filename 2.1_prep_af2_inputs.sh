@@ -7,12 +7,12 @@
 #SBATCH --qos=normal
 #SBATCH --gres=gpu:1
 #SBATCH --mem=10gb
-#SBATCH --time=01:00:00
-#SBATCH --output=af2_inputs_%A.log
+#SBATCH --time=00:30:00
+#SBATCH --output=log/af2_inputs_%A.log
 
 
 WD="/work/lpdi/users/eline/smol_binder_diffusion_pipeline"
-OD="b2_1Z9Yout"
+OD="/work/lpdi/users/eline/smol_binder_diffusion_pipeline/b2_1Z9Yout"
 
 
 # args: WD, OD

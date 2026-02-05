@@ -9,7 +9,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --mem=42gb
 #SBATCH --time=34:00:00
-#SBATCH --output=rfdiffaa2_%A_%a.log
+#SBATCH --output=log/rfdiffaa2_%A_%a.log
 
 
 # setup:

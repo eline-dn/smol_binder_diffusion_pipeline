@@ -27,7 +27,7 @@ CONDAPATH = "/work/lpdi/users/eline/miniconda3"  # edit this depending on where 
 PYTHON = {
     "diffusion": f"{CONDAPATH}/envs/diffusion/bin/python",
     # "af2":"/work/lpdi/users/mpacesa/Pipelines/miniforge3/envs/BindCraft_kuma/bin/python",
-    "af2": f"{CONDAPATH}/envs/mlfold/bin/python",
+    "af2": f"{CONDAPATH}/envs/alphafold/bin/python",
     "proteinMPNN": f"{CONDAPATH}/envs/diffusion/bin/python",
     "general": f"{CONDAPATH}/envs/diffusion/bin/python",
 }
@@ -36,7 +36,7 @@ PYTHON = {
 
 USE_GPU_for_AF2 = True
 DIFFUSION_DIR = f"{WDIR}/0_diffusion"
-MPNN_DIR = f"{WDIR}/1_proteinmpnn"
+MPNN_DIR = f"{WDIR}/1_protein_mpnn"
 AF2_DIR = f"{WDIR}/2_af2"
 
 
@@ -48,6 +48,8 @@ os.chdir(AF2_DIR)
 fasta_files = glob.glob(f"{MPNN_DIR}/seqs/*.fa") ### output file
 output_dir = f"{AF2_DIR}/trimmed_fastas"
 os.makedirs(output_dir, exist_ok=True)
+if len(fasta_files)==0:
+    raise ValueError(f"no fasta files found in {MPNN_DIR}/seqs/")
 
 for ff in fasta_files:
     with open(ff, "r") as f:
@@ -90,11 +92,14 @@ cmds_filename_af2 = "commands_af2"
 with open(cmds_filename_af2, "w") as file:
     for ff in glob.glob("*.fasta"):
         AF2_models = random.choice([3, 4, 5])
-        commands_af2.append(f"{PYTHON['af2']} {AF2_script} "
+        commands_af2.append(f"{PYTHON["af2"]} {AF2_script} "
                           f"--af-nrecycles {AF2_recycles} --af-models {AF2_models} "
                           f"--fasta {ff} --scorefile {ff.replace('.fasta', '.csv')}\n")
         file.write(commands_af2[-1])
 
+if len(commands_af2)==0:
+    raise ValueError("Empty command file, no af2 commands were generated")
+    
 print("Example AF2 command:")
 print(commands_af2[-1])
 print("Number of AF2 commands:")

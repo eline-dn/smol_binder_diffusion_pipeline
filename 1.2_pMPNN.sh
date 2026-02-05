@@ -3,13 +3,13 @@
 #SBATCH --array=1-3
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=12
 #SBATCH --partition=h100
 #SBATCH --qos=normal
 #SBATCH --gres=gpu:1
-#SBATCH --mem=42gb
-#SBATCH --time=70:00:00
-#SBATCH --output=pmpnn_%A_%a.log
+#SBATCH --mem=60gb
+#SBATCH --time=20:00:00
+#SBATCH --output=log/pmpnn_%A_%a.log
 
 
 WD="/work/lpdi/users/eline/smol_binder_diffusion_pipeline"
@@ -22,7 +22,7 @@ DIFFUSION_DIR="$OD/0_diffusion/"
 
 PYTHON="python"  #Python interpreter
 
-cd "$OD/1_proteinmpnn"
+cd "$OD/1_protein_mpnn"
 
 # check input files existence
 if [ ! -f "masked_pos.jsonl" ]; then
@@ -41,26 +41,41 @@ conda activate diffusion
 case $SLURM_ARRAY_TASK_ID in
     1)
         echo "running cmd 1 "
-        python "$WD/lib/LigandMPNN/run.py" --model_type protein_mpnn --ligand_mpnn_use_atom_context 0 --file_ending "_T0.$SLURM_ARRAY_TASK_ID"
-                --fixed_residues_multi masked_pos.jsonl --out_folder ./  
-                --number_of_batches 5 --temperature "0.$SLURM_ARRAY_TASK_ID"
-                --omit_AA "CM" --pdb_path_multi redesign_pdb.json 
-                --checkpoint_protein_mpnn "$WD/lib/LigandMPNN/model_params/proteinmpnn_v_48_020.pt"
+        python "$WD/lib/LigandMPNN/run.py" --model_type protein_mpnn \
+        --ligand_mpnn_use_atom_context 0 \
+        --file_ending "_T0.$SLURM_ARRAY_TASK_ID" \
+        --fixed_residues_multi masked_pos.jsonl \
+        --out_folder ./ \
+        --number_of_batches 5 \
+        --temperature "0.$SLURM_ARRAY_TASK_ID" \
+        --omit_AA "CM" \
+        --pdb_path_multi redesign_pdb.json \
+        --checkpoint_protein_mpnn "$WD/lib/LigandMPNN/model_params/proteinmpnn_v_48_020.pt"
         ;;
     2)
         echo "running cmd 2 "
-        python "$WD/lib/LigandMPNN/run.py" --model_type protein_mpnn --ligand_mpnn_use_atom_context 0 --file_ending "_T0.$SLURM_ARRAY_TASK_ID"
-                --fixed_residues_multi masked_pos.jsonl --out_folder ./  
-                --number_of_batches 5 --temperature "0.$SLURM_ARRAY_TASK_ID"
-                --omit_AA "CM" --pdb_path_multi redesign_pdb.json 
-                --checkpoint_protein_mpnn "$WD/lib/LigandMPNN/model_params/proteinmpnn_v_48_020.pt"
+        python "$WD/lib/LigandMPNN/run.py" --model_type protein_mpnn \
+        --ligand_mpnn_use_atom_context 0 \
+        --file_ending "_T0.$SLURM_ARRAY_TASK_ID" \
+        --fixed_residues_multi masked_pos.jsonl \
+        --out_folder ./ \
+        --number_of_batches 5 \
+        --temperature "0.$SLURM_ARRAY_TASK_ID" \
+        --omit_AA "CM" \
+        --pdb_path_multi redesign_pdb.json \
+        --checkpoint_protein_mpnn "$WD/lib/LigandMPNN/model_params/proteinmpnn_v_48_020.pt"
         ;;
     3)
         echo "running cmd 3 "
-        python "$WD/lib/LigandMPNN/run.py" --model_type protein_mpnn --ligand_mpnn_use_atom_context 0 --file_ending "_T0.$SLURM_ARRAY_TASK_ID"
-                --fixed_residues_multi masked_pos.jsonl --out_folder ./  
-                --number_of_batches 5 --temperature "0.$SLURM_ARRAY_TASK_ID"
-                --omit_AA "CM" --pdb_path_multi redesign_pdb.json 
-                --checkpoint_protein_mpnn "$WD/lib/LigandMPNN/model_params/proteinmpnn_v_48_020.pt"
+        python "$WD/lib/LigandMPNN/run.py" --model_type protein_mpnn \
+        --ligand_mpnn_use_atom_context 0 \
+        --file_ending "_T0.$SLURM_ARRAY_TASK_ID" \
+        --fixed_residues_multi masked_pos.jsonl \
+        --out_folder ./ \
+        --number_of_batches 5 \
+        --temperature "0.$SLURM_ARRAY_TASK_ID" \
+        --omit_AA "CM" \
+        --pdb_path_multi redesign_pdb.json \
+        --checkpoint_protein_mpnn "$WD/lib/LigandMPNN/model_params/proteinmpnn_v_48_020.pt"
         ;;
 esac

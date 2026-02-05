@@ -6,10 +6,12 @@ scripts/design/ligandmpnn_pocket_design_nofilters.py
 scripts/utils/__pycache__/utils.cpython-310.pyc
 
 # Ignore output folders and files
+log/
 1Z9Yout/
 3DGQout/
 envs/mlfold2.yml
 input/
+b2_1Z9Yout/
 ligandmpnn_env.yml
 scripts/af2/__pycache__/
 scripts/design/__pycache__/setup_fixed_positions_around_target.cpython-310.pyc

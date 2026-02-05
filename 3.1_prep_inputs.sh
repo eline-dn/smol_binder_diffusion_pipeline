@@ -12,7 +12,7 @@
 
 
 WD="/work/lpdi/users/eline/smol_binder_diffusion_pipeline"
-OD="b2_1Z9Yout"
+OD="/work/lpdi/users/eline/smol_binder_diffusion_pipeline/b2_1Z9Yout"
 
 
 # args: WD, OD

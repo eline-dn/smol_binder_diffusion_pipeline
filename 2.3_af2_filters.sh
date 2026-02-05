@@ -12,10 +12,19 @@
 
 
 WD="/work/lpdi/users/eline/smol_binder_diffusion_pipeline"
-OD="b2_1Z9Yout/"
+OD="/work/lpdi/users/eline/smol_binder_diffusion_pipeline/b2_1Z9Yout/"
 DIFFUSION_DIR="$OD/0_diffusion"
 AF2_DIR="$OD/2_af2"
 mkdir "$DIFFUSION_DIR/bindersonly"
+
+# Combining all CSV scorefiles into one
+head -n 1 $(ls *aa*.csv | shuf -n 1) > scores.csv ; for f in *aa*.csv ; do tail -n +2 ${f} >> scores.csv ; done
+
+if [ ! -f "scores.csv" ]; then
+    echo "Could not combine scorefiles"
+    exit 1
+fi
+
 
 # trim backbone pdbs to align binder to repredicted af2 structure
 python "$WD/scripts/utils/trim_ref_pdb_nterm.py" "$DIFFUSION_DIR/" "$DIFFUSION_DIR/bindersonly"
