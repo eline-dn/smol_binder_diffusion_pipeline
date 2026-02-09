@@ -5,7 +5,7 @@ Created on Tue Jan 25 2022
 
 @author: ikalvet
 """
-import sys, os, glob
+import sys, os, glob, shutil
 sys.path = [x for x in sys.path if sys.base_exec_prefix in x] + [x for x in sys.path if sys.base_exec_prefix not in x]
 import pyrosetta as pyr
 import pyrosetta.rosetta
@@ -34,7 +34,6 @@ def reorder_df_columns(df):
 def dump_scorefile(df, filename):
     widths = {}
     namekeys = ["description", "name", "Output_PDB", "Name"]
-
     for k in df.keys():
         if k in ["SCORE:"] + namekeys:
             widths[k] = 0
@@ -42,7 +41,6 @@ def dump_scorefile(df, filename):
             widths[k] = len(k) + 1
         else:
             widths[k] = 12
-
     with open(filename, "w") as file:
         title = ""
         for k in df.keys():
@@ -55,7 +53,6 @@ def dump_scorefile(df, filename):
         if all([t not in df.keys() for t in namekeys]):
             title += f" {'description'}"
         file.write(title + "\n")
-        
         for index, row in df.iterrows():
             line = ""
             for k in df.keys():
@@ -198,6 +195,9 @@ def main():
         sys.exit(0)
 
     scores = pd.read_csv(scorefile, header=0)
+    # coerce numerical columns:
+    scores.lDDT = pd.to_numeric(scores.lDDT, errors='coerce')
+    #scores = pd.to_numeric(scores.lDDT, errors='coerce')
 
     print(f"Only calculating RMSD for predictions with lDDT >= {lddt_cutoff:.1f}")
     if len(scores.loc[scores.lDDT > lddt_cutoff]) == 0:
@@ -420,7 +420,7 @@ def main():
         print(f"Writing scorefile with per-residue sc-rmsd values: {pocket_scorefile}")
         dump_scorefile(pocket_df, pocket_scorefile)
 
-    dump_scorefile(scores, args.out)
+    dump_scorefile(scores, args.out) ####
     # filtering the binders:
     scores_af2 = pd.read_csv("scores.sc", sep="\s+", header=0)
     scores_af2['lDDT'] = pd.to_numeric(scores_af2['lDDT'], errors='coerce')
@@ -433,7 +433,7 @@ def main():
         scores_af2["pass_filters"]=(scores_af2['lDDT'] >=lddt_cutoff) & (scores_af2['rmsd'] <= rmsd_cutoff)
         # plotting our binder distribution:
         plt.figure(figsize=(10, 5))
-        sns.scatterplot(data=scores_af2, x='plDDT', y='rmsd', hue=pass_filters)
+        sns.scatterplot(data=scores_af2, x='lDDT', y='rmsd', hue="pass_filters")
         plt.xlabel('plDDT')
         plt.ylabel('rmsd')
         plddt = lddt_cutoff
@@ -449,10 +449,11 @@ def main():
         ### Copying good predictions to a separate directory
         if len(scores_af2_filtered) > 0:
             print(f"Found {len(scores_af2_filtered)} binders passing thresholds, saving them in {dir_filtered}")
-            utils.dump_scorefile(scores_af2_filtered, os.path.join(dir_filtered,"filtered_scores.sc"))
+            scores_af2_filtered.to_csv( os.path.join(dir_filtered,"filtered_scores.csv"), index=False)
+            #dump_scorefile(scores_af2_filtered, os.path.join(dir_filtered,"filtered_scores.sc"))
             good_af2_models = [row["Output_PDB"]+".pdb" for idx,row in scores_af2_filtered.iterrows()]
             for pdb in good_af2_models:
-                copy2(f"{pdb}", os.path.join(dir_filtered, pdb))
+                shutil.copy2(f"{pdb}", os.path.join(dir_filtered, pdb))
         else:
             sys.exit("No good models to continue this pipeline with")
 

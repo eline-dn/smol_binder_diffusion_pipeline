@@ -12,7 +12,7 @@
 
 
 WD="/work/lpdi/users/eline/smol_binder_diffusion_pipeline"
-OD="/work/lpdi/users/eline/smol_binder_diffusion_pipeline/b2_1Z9Yout/"
+OD="/work/lpdi/users/eline/smol_binder_diffusion_pipeline/b2_1Z9Yout"
 DIFFUSION_DIR="$OD/0_diffusion"
 AF2_DIR="$OD/2_af2"
 mkdir "$DIFFUSION_DIR/bindersonly"
@@ -30,7 +30,8 @@ fi
 python "$WD/scripts/utils/trim_ref_pdb_nterm.py" "$DIFFUSION_DIR/" "$DIFFUSION_DIR/bindersonly"
 # args: path to the folder with pdb files to trim, and path to the output folder
 cd $AF2_DIR
+
 # calculating rmsd af af2 predictions and filtering good models
-python "$WD/scripts/utils/analyze_af2.py --scorefile scores.csv \
-               --ref_path $DIFFUSION_DIR/bindersonly/ --mpnn --lddt 0.80 --rmsd 1.5"
+conda activate diffusion
+python "$WD/scripts/utils/analyze_af2.py" --scorefile scores.csv --ref_path $DIFFUSION_DIR/bindersonly --mpnn --lddt 0.80 --rmsd 1.5
 

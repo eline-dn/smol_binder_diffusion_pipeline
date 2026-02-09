@@ -37,7 +37,7 @@ LIGAND = "FUN"
 ### Setting up design directory and commands
 AF2_DIR = f"{WDIR}/2_af2"
 #os.makedirs(DESIGN_DIR_ligMPNN+"/logs", exist_ok=True)
-MPNN_DIR = f"{WDIR}/1_proteinmpnn"
+MPNN_DIR = f"{WDIR}/1_protein_mpnn"
 AF2_DIR = f"{WDIR}/2_af2"
 DIFFUSION_DIR = f"{WDIR}/0_diffusion"
 good_af2_models = glob.glob(f"{AF2_DIR}/good/*.pdb") # these models only will be redesigned
@@ -115,4 +115,3 @@ utils.create_slurm_submit_script(filename=submit_script, name="2_af2", mem="6g",
 #p = subprocess.Popen(['sbatch', submit_script], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 #(output, err) = p.communicate()
 
-"""

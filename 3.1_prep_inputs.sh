@@ -14,7 +14,7 @@
 WD="/work/lpdi/users/eline/smol_binder_diffusion_pipeline"
 OD="/work/lpdi/users/eline/smol_binder_diffusion_pipeline/b2_1Z9Yout"
 
-
+cd $WD
 # args: WD, OD
 python "$WD/3_lig_MPNN_redesign.py" $WD $OD
 cd "$OD/3_ligandMPNN"
